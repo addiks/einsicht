@@ -1,0 +1,49 @@
+
+from PySide6 import QtCore, QtWidgets, QtGui
+
+# https://stackoverflow.com/questions/50074155/how-to-add-line-number-in-this-texteditor
+
+class LineNumbers(QtWidgets.QWidget):
+    
+    def __init__(self, editor):
+        QtWidgets.QWidget.__init__(self, parent=editor)
+        self.editor = editor
+        
+        # self.editor.textField.updateRequest.connect(self.update)
+        
+    def sizeHint(self):
+        return QtCore.QSize(20, 0);
+        
+    def onUpdate(self, rect, dy):
+        self.update(0, rect.y(), self.width(), rect.height())
+        
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.fillRect(event.rect(), QtCore.Qt.lightGray)
+        
+        textField = self.editor.textField
+        
+        block = textField.firstVisibleBlock()
+        blockNumber = block.blockNumber()
+        blockRect = textField.blockBoundingGeometry(block) # QRectF
+        
+        top = blockRect.translated(textField.contentOffset()).top()
+        bottom = top + textField.blockBoundingRect(block).height()
+        
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                number = str(blockNumber + 1)
+                painter.setPen(QtCore.Qt.black)
+                painter.drawText(
+                    0, 
+                    top, 
+                    self.width(),
+                    textField.fontMetrics().height(),
+                    QtCore.Qt.AlignRight,
+                    number
+                )
+            block = block.next()
+            top = bottom
+            bottom = top + textField.blockBoundingRect(block).height()
+            blockNumber += 1
+        

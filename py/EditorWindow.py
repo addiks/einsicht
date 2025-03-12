@@ -1,12 +1,14 @@
 
 from PySide6 import QtCore, QtWidgets, QtGui
-from py.TextField import TextField
-from py.LineNumbers import LineNumbers
-from py.MessageBroker import MessageBroker
 from os.path import basename, dirname, abspath
 from PySide6.QtCore import QTimer
 import subprocess
 import os
+
+from py.TextField import TextField
+from py.LineNumbers import LineNumbers
+from py.MessageBroker import MessageBroker
+from py.Languages.LanguageSelector import LanguageSelector
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
@@ -50,8 +52,16 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             dirname(self.filePath)
         ))
         
+        document = self.textField.document()
+        
+        selector = LanguageSelector()
+        self.language = selector.selectForFilePath(self.filePath)
+        
+        # if self.language != None:
+        #     self.highlighter = self.language.syntaxHighlighter(document)
+        
         handle = open(self.filePath, "r")
-        self.textField.document().setPlainText(handle.read())
+        document.setPlainText(handle.read())
         
     def saveFile(self):
         text = self.textField.document().toPlainText()
@@ -109,7 +119,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         bashScript = "/home/gerrit/workspace/Privat/qtEdit/run.sh"
         
-        os.system(f"{bashScript} '{filePath}'")
+        os.system(f"nohup {bashScript} '{filePath}' 2>&1 > {bashScript}.log")
         
     def _afterTextChanged(self):
         self.setMinimumWidth(0)

@@ -15,7 +15,7 @@ class LineNumbers(QtWidgets.QWidget):
         return QtCore.QSize(20, 0);
         
     def onUpdate(self, rect, dy):
-        self.update(0, rect.y(), self.width(), rect.height())
+        self.update()
         
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)

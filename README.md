@@ -1,7 +1,7 @@
 adEdit – Minimalist SDI Text Editor / Mini-IDE
 ===================================
 This is a text-editor built for SDI (Single Document Interface) operations, 
-made to be used with modern window-managers that allow for effecient management
+made to be used with modern window-managers that allow for efficient management
 of many SDI windows. 
 
 ## Implementation
@@ -12,7 +12,7 @@ processes/documents is done using DBUS.
 ## Features
 **Implemented** Features:
 * Open/Edit/Save ASCII files
-* Dynmic Window-Size based on file contents
+* Dynamic Window-Size based on file contents
 * Open-only-Once: If you try to open the same file twice, 
   the first window is presented instead
 * Line-Numbers

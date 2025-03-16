@@ -4,11 +4,13 @@ from os.path import basename, dirname, abspath
 from PySide6.QtCore import QTimer
 import subprocess
 import os
+import hashlib
 
 from py.TextField import TextField
 from py.LineNumbers import LineNumbers
 from py.MessageBroker import MessageBroker
 from py.Languages.LanguageSelector import LanguageSelector
+from py.Languages.Language import Language
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
@@ -43,31 +45,57 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     def closeFile(self):
         self.filePath = None
         self.setWindowTitle("[No file] - qtEdit")
+        self.hashOnDisk = ""
+        self.lengthOnDisk = 0
         
     def openFile(self, filePath):
         self.filePath = abspath(filePath)
         self.messageBroker = MessageBroker(self)
-        self.setWindowTitle("%s (%s) - qtEdit" % (
-            basename(self.filePath), 
-            dirname(self.filePath)
-        ))
         
         document = self.textField.document()
         
         selector = LanguageSelector()
         self.language = selector.selectForFilePath(self.filePath)
         
-        # if self.language != None:
-        #     self.highlighter = self.language.syntaxHighlighter(document)
-        
         handle = open(self.filePath, "r")
-        document.setPlainText(handle.read())
+        text = handle.read()
+
+        if self.language != None:
+            assert isinstance(self.language, Language)
+            self.syntaxTree = self.language.parse(text)
+            self.highlighter = self.language.syntaxHighlighter(document, self.syntaxTree)
+        
+        self.hashOnDisk = hashlib.md5(text.encode()).hexdigest()
+        self.lengthOnDisk = len(text)
+        
+        document.setPlainText(text)
+        
+        self.updateTitle()
         
     def saveFile(self):
         text = self.textField.document().toPlainText()
         
         handle = open(self.filePath, "w")
         handle.write(text)
+        self.hashOnDisk = hashlib.md5(text.encode()).hexdigest()
+        self.lengthOnDisk = len(text)
+        self.updateTitle()
+
+    def updateTitle(self):
+        text = self.textField.document().toPlainText()
+        textHash = hashlib.md5(text.encode()).hexdigest()
+        modified = (len(text) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
+
+        if modified:
+            self.setWindowTitle("* %s (%s) - qtEdit" % (
+                basename(self.filePath), 
+                dirname(self.filePath)
+            ))
+        else:
+            self.setWindowTitle("%s (%s) - qtEdit" % (
+                basename(self.filePath), 
+                dirname(self.filePath)
+            ))
         
     def presentSelf(self):
         self.activateWindow()
@@ -77,6 +105,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.lineNumbers.onUpdate(rect, dy)
         
     def onTextChanged(self):
+        self.updateTitle()
         contentWidth = self.textField.contentWidth()
         contentHeight = self.textField.contentHeight()
         

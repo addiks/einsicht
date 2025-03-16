@@ -10,6 +10,11 @@ class LanguageSelector:
     
     def selectForFilePath(self, filePath):
         (mimeType, n) = self.mime.guess_type(filePath)
+        
+        if mimeType == None:
+            print("No Mime Type!")
+            return None
+        
         return self.selectForMimeType(mimeType)
         
     def selectForMimeType(self, mimeType):
@@ -17,6 +22,9 @@ class LanguageSelector:
         
         if mimeType == "text/x-python":
             return PythonLanguage()
+        
+        if mimeType == "text/php":
+            return PHPLanguage()
         
         [category, subcategory] = mimeType.split("/")
         print(category)

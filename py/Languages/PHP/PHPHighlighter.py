@@ -2,7 +2,7 @@
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QFont
 from PySide6.QtCore import QRegularExpression, Qt
 
-class PythonHighlighter(QSyntaxHighlighter):
+class PHPHighlighter(QSyntaxHighlighter):
     
     def highlightBlock(self, text):
 

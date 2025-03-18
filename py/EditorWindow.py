@@ -10,7 +10,7 @@ from py.TextField import TextField
 from py.LineNumbers import LineNumbers
 from py.MessageBroker import MessageBroker
 from py.Languages.LanguageSelector import LanguageSelector
-from py.Languages.Language import Language
+from py.Languages.Language import Language, LanguageFromSyntaxTreeHighlighter
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
@@ -133,6 +133,12 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         afterUpdate.setInterval(10)
         afterUpdate.timeout.connect(self._afterTextChanged)
         afterUpdate.start()
+
+        text = self.textField.document().toPlainText()
+
+        self.syntaxTree = self.language.parse(text)
+        if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
+            self.highlighter.updateSyntaxTree(self.syntaxTree)
         
     def showOpenFilePicker(self):
         print('showOpenFilePicker')

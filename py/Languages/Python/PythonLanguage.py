@@ -4,49 +4,61 @@ from PySide6.QtCore import QRegularExpression, Qt
 
 from ..Language import Language, Token
 from ..Language import KeywordsTokenMatcher, RegexMatcher, DirectTokenMatcher, LiteralTokenMatcher
-from ..Language import GrammarBranch, TokenSequenceGrammar, OptionalNode, NodeSequence
+from ..Language import GrammarBranch, TokenSequenceGrammar
+from ..Language import OptionalNode, NodeSequence, RepeatingNode, NodeBranch, TokenNodePattern, NodesAsASTBranch
 
 from collections import OrderedDict
 
 class PythonLanguage(Language):
 
-    def tokenMatcher(self): # OrderedDict<string, TokenMatcher>
-        matchers = OrderedDict()
-        matchers['KEYWORDS'] = KeywordsTokenMatcher([
-            "from", "import", "def", "pass", "class", 
-            "if", "elif", "else", "not",
-            "return", "break", "continue", "raise", "except", "try"
-        ], self)
-        matchers['WHITESPACE'] = RegexMatcher(r'\s+', "T_WHITESPACE")
-        matchers['DECORATOR'] = DirectTokenMatcher("@", "T_DECORATOR")
-        matchers['SYMBOL'] = RegexMatcher(r'[a-zA-Z0-9_]+', "T_SYMBOL")
-        matchers['SPECIAL_CHAR'] = DirectTokenMatcher([
-            ".", ",", "(", ")", "[", "]", "{", "}", ":", "="
-        ], "T_SPECIAL_CHAR")
-        matchers['OPERATOR'] = DirectTokenMatcher(
-            ["+", "-", "*", "/"], 
-            "T_OPERATOR"
-        )
-        matchers['LITERAL_SINGLE'] = LiteralTokenMatcher("'", "T_LITERAL")
-        matchers['LITERAL_DOUBLE'] = LiteralTokenMatcher('"', "T_LITERAL")
-        return matchers
+    def tokenMatchers(self): # list<TokenMatcher>
+        return [
+            KeywordsTokenMatcher([
+                "from", "import", "def", "pass", "class", 
+                "if", "elif", "else", "not",
+                "return", "break", "continue", "raise", "except", "try"
+            ], self),
+            RegexMatcher(r'\s+', "T_WHITESPACE"),
+            RegexMatcher(r'\s+', "T_WHITESPACE"),
+                DirectTokenMatcher("@", "T_DECORATOR"),
+            RegexMatcher(r'[a-zA-Z0-9_]+', "T_SYMBOL"),
+            DirectTokenMatcher([
+                ".", ",", "(", ")", "[", "]", "{", "}", ":", "="
+            ], "T_SPECIAL_CHAR"),
+            DirectTokenMatcher(
+                ["+", "-", "*", "/"], 
+                "T_OPERATOR"
+            ),
+            LiteralTokenMatcher("'", "T_LITERAL"),
+            LiteralTokenMatcher('"', "T_LITERAL")
+        ]
 
     def grammar(self):
 
-        importStatement = TokenSequenceGrammar([
-            OptionalNode(NodeSequence(["T_FROM", "T_SYMBOL"]))
-        ], "import")
+         importStatement = NodesAsASTBranch("import", NodeSequence([
+             OptionalNode(NodeSequence([
+                 TokenNodePattern("T_FROM"),
+                 TokenNodePattern("T_SYMBOL")
+             ])) # ,
+#             TokenNodePattern("T_IMPORT"),
+#             TokenNodePattern("T_SYMBOL"),
+#             RepeatingNode(NodeSequence([
+#                 TokenNodePattern(","),
+#                 TokenNodePattern("T_SYMBOL")
+#             ]))
+         ]))
 
-        statement = GrammarBranch([
+         grammar = RepeatingNode(NodeBranch([
+             importStatement
+         ]))
 
-        ])
-
-        return statement
+         return grammar
 
     def formatForNode(self, node):
         if type(node) == Token: 
 
             if node.tokenName in ["T_CLASS", "T_DEF"]:
+                # print([node.code, node.offset, node.row, node.col])
                 format = QTextCharFormat()
                 format.setFontWeight(QFont.Bold)
                 format.setForeground(Qt.darkMagenta)
@@ -65,14 +77,17 @@ class PythonLanguage(Language):
                 return format
 
             if node.tokenName in ["T_FROM", "T_IMPORT"]:
+                # print([node.code, node.offset, node.row, node.col])
                 format = QTextCharFormat()
                 format.setForeground(Qt.darkYellow)
+                if node.tokenName == "T_IMPORT":
+                    format.setFontWeight(QFont.Bold)
                 return format
 
             if node.tokenName == "T_SYMBOL":
                 # print([node.code, node.offset])
                 format = QTextCharFormat()
-                format.setForeground(Qt.blue)
+                format.setForeground(Qt.black)
                 if node.code in ["self", "super"]:
                     format.setFontWeight(QFont.Bold)
                 return format

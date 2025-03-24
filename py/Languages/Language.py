@@ -3,6 +3,9 @@ from PySide6.QtGui import QSyntaxHighlighter
 from collections import OrderedDict
 import re, hashlib
 
+from .AbstractSyntaxTree import ASTNode, ASTBranch, NodePattern
+from .Tokens import Token, TokenMatcher, TokenDef
+
 class Language: # abstract
 
     def __init__(self):
@@ -16,10 +19,13 @@ class Language: # abstract
     def tokenMatchers(self): # list<TokenMatcher>
         raise NotImplementedError
 
-    def grammar(self): # GrammarBranch
+    def grammar(self): # NodePattern
         raise NotImplementedError
 
-    def formatForNode(self, node):
+    def formatForNode(self, node): # QFormat
+        raise NotImplementedError
+
+    def isNodeRelevantForGrammar(self, node): # boolean
         raise NotImplementedError
 
     def parse(self, code): # return: ASTNode
@@ -27,20 +33,66 @@ class Language: # abstract
         if hash not in self._parseCache:
             tokens = self.lex(code)
 
+            tokens = self.normalize(tokens)
+
+            #for token in tokens:
+            #    print([token.row, token.col, token.tokenName, token.code])
+
             grammar = self.grammar()
             assert isinstance(grammar, NodePattern)
 
-            if grammar.matches(tokens):
-                (success, remainingNodes, newNodes) = grammar.consume(tokens)
-                print([success, remainingNodes, newNodes])
-                if success:
-                    nodes = remainingNodes + newNodes
+            nodes = []
+            nodesToProcess = tokens
+            while len(nodesToProcess) > 0:
+                if grammar.matches(nodesToProcess):
+                    (success, remainingNodes, newNodes) = grammar.consume(nodesToProcess)
+                    # print([success, remainingNodes, newNodes])
+                    if success:
+                        nodes = nodes + newNodes
+                        nodesToProcess = remainingNodes
+                    else:
+                        nodes.append(nodesToProcess.pop(0))
+                else:
+                    nodes.append(nodesToProcess.pop(0))
+                
 
-            for node in nodes:
-                print([node.row, node.col, node.code])
+
+            # nodes = tokens
+            #if grammar.matches(tokens):
+            #    (success, remainingNodes, newNodes) = grammar.consume(tokens)
+            #    print([success, remainingNodes, newNodes])
+            #    if success:
+            #        nodes = newNodes + remainingNodes
+
+            #for node in nodes:
+            #    if type(node) == Token:
+            #        print([node.row, node.col, node.tokenName, node.code])
+            #    else:
+            #        print([node.row, node.col, node.type, node.code])
 
             self._parseCache[hash] = ASTBranch(nodes, "root")
         return self._parseCache[hash]
+
+    def normalize(self, tokens):
+        index = 0
+        while index < len(tokens):
+            predecessor = None
+            if index > 0:
+                predecessor = tokens[index - 1]
+            successor = None
+            if index < len(tokens) - 1:
+                successor = tokens[index + 1]
+            if not self.isNodeRelevantForGrammar(tokens[index]):
+                if index > 0:
+                    tokens[index - 1].append(tokens[index])
+                    tokens = tokens[:index] + tokens[index+1:]
+                    index -= 1
+                elif index < len(tokens) - 1:
+                    tokens[index + 1].prepend(tokens[index])
+                    tokens = tokens[:index] + tokens[index+1:]
+                    index -= 1
+            index += 1
+        return tokens
 
     def lex(self, code):
         hash = hashlib.md5(code.encode()).hexdigest()
@@ -70,24 +122,38 @@ class Language: # abstract
                         assert isinstance(token, Token)
                         tokens.append(token)
 
-                    processedLength = len(code) - len(codeAfter)
-                    processedCode = code[:processedLength]
+                    processedCode = code[:(len(code) - len(codeAfter))]
 
-                    offset += processedLength
-                    row += processedCode.count("\n")
-                    if "\n" in processedCode:
-                        col = (len(processedCode) - processedCode.rfind("\n"))
-                    else:
-                        col += processedLength
-
+                    (offset, row, col) = self._rowAndColForProcessed(processedCode, offset, row, col)
+ 
                     code = codeAfter
                     if tokenDef != None:
                         break
+                        
                 if beforeLength == len(code):
-                    print("Could not parse remaining code!")
-                    break
+                    tokens.append(Token(
+                        self, 
+                        "T_INVALID",
+                        code[0],
+                        row,
+                        col,
+                        offset
+                    ))
+                    (offset, row, col) = self._rowAndColForProcessed(code[0], offset, row, col)
+                    code = code[1:]
+                    
             self._lexCache[hash] = tokens
         return self._lexCache[hash]
+        
+    def _rowAndColForProcessed(self, processedCode, offset, row, col):
+        processedLength = len(processedCode)
+        offset += processedLength
+        row += processedCode.count("\n")
+        if "\n" in processedCode:
+            col = (len(processedCode) - processedCode.rfind("\n"))
+        else:
+            col += processedLength
+        return (offset, row, col)
 
 class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
     
@@ -116,251 +182,13 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
                     format
                 )
 
+        for predecessor in node.prepended:
+            self.highlightAstNode(predecessor, length)
+
+        for successor in node.appended:
+            self.highlightAstNode(successor, length)
+
         if type(node) == ASTBranch:
             for child in node.children:
                 self.highlightAstNode(child, length)
 
-### NODE PATTERNS
-
-class NodePattern:
-    def matches(self, nodes):
-        raise NotImplementedError
-
-    def consume(self, nodes):
-        raise NotImplementedError
-
-class TokenNodePattern(NodePattern):
-    def __init__(self, tokenName):
-        self._tokenName = tokenName
-
-    def matches(self, nodes):
-        node = nodes[0]
-        if type(node) == Token:
-            expected = self._tokenName
-            return node.tokenName == expected or node.code == expected
-        return False
-
-    def consume(self, nodes):
-        success = False
-        newNodes = []
-
-        if self.matches(nodes):
-            success = True
-            newNodes.append(nodes.pop(0))
-
-        return (success, nodes, newNodes)
-
-class OptionalNode(NodePattern):
-    def __init__(self, element):
-        # print(element)
-        assert isinstance(element, (str, ASTNode, NodePattern))
-        self.element = element
-
-    def matches(self, nodes):
-        return True
-
-    def consume(self, nodes):
-        if self.element.matches(nodes):
-            return self.element.consume(nodes)
-        return (False, nodes, [])
-
-
-class NodeSequence(NodePattern):
-    def __init__(self, patterns):
-        self._patterns = patterns
-
-    def matches(self, nodes):
-        for pattern in self._patterns:
-            if not pattern.matches(nodes):
-                return False
-            else:
-                (success, nodes, producedNodes) = pattern.consume(nodes)
-        return True
-
-    def consume(self, nodes):
-        newNodes = []
-        success = False
-        for pattern in self._patterns:
-            if not pattern.matches(nodes):
-                success = False
-                break
-            else:
-                (success, nodes, producedNodes) = pattern.consume(nodes)
-                if not success:
-                    break
-                for node in producedNodes:
-                    newNodes.append(node)
-        return (success, nodes, newNodes)
-
-class NodeBranch(NodePattern):
-    def __init__(self, patterns):
-        self._patterns = patterns
-    
-    def matches(self, nodes):
-        for pattern in self._patterns:
-            if pattern.matches(nodes):
-                return True
-        return False
-
-    def consume(self, nodes):
-        newNodes = []
-        success = False
-        for pattern in self._patterns:
-            if pattern.matches(nodes):
-                return pattern.consume(nodes)
-        return (False, nodes, [])
-
-class RepeatingNode(NodePattern):
-    def __init__(self, pattern):
-        self._pattern = pattern
-
-    def matches(self, nodes):
-        return True
-
-    def consume(self, nodes):
-        newNodes = []
-        while self._pattern.matches(nodes):
-            (success, remainingNodes, producedNodes) = self._pattern.consume(nodes)
-            if success:
-                nodes = remainingNodes
-                newNodes = newNodes + producedNodes
-            else:
-                break
-        return (True, nodes, newNodes)
-
-class NodesAsASTBranch(NodePattern):
-    def __init__(self, astType, pattern):
-        self._pattern = pattern
-        self._astType = astType
-
-    def matches(self, nodes):
-        return self._pattern.matches(nodes)
-
-    def consume(self, nodes):
-        (success, remainingNodes, producedNodes) = self._pattern.consume(nodes)
-        if success:
-            return (success, remainingNodes, ASTBranch(producedNodes, self._astType))
-        else:
-            return (success, remainingNodes, producedNodes)
-
-### AST
-
-class ASTNode:
-    def __init__(self, language, code, row, col, offset, type):
-        self.language = language
-        self.code = code
-        self.row = row
-        self.col = col
-        self.offset = offset
-        self.type = type
-
-class ASTBranch(ASTNode):
-    def __init__(self, children, type):
-        self.children = children
-        firstChild = children[0]
-        code = ""
-        for child in children:
-            code += child.code
-        super().__init__(
-            firstChild.language,
-            code,
-            firstChild.row,
-            firstChild.col,
-            firstChild.offset,
-            type
-        )
-
-
-### TOKENS
-
-class Token(ASTNode):
-    def __init__(self, language, tokenName, code, row, col, offset):
-        super().__init__(language, code, row, col, offset, "token")
-        self.tokenName = tokenName
-
-class TokenDef:
-    def __init__(self, tokenName, code):
-        self.tokenName = tokenName
-        self.code = code
-
-    def toToken(self, language, row, col, offset):
-        return Token(
-            language, 
-            self.tokenName,
-            self.code,
-            row,
-            col,
-            offset
-        )
-
-
-### TOKEN MATCHER
-
-class TokenMatcher:
-    def lexNext(self, text): # return: (text, TokenDef|null)
-        raise NotImplementedError
-        
-class KeywordsTokenMatcher(TokenMatcher):
-    def __init__(self, keywords, language):
-        self._keywords = keywords
-        self._language = language
-
-    def lexNext(self, text): # return: (text, TokenDef|None)
-        token = None
-        for keyword in self._keywords:
-            if text[0:len(keyword)].upper() == keyword.upper():
-                tokenName = "T_" + keyword.upper()
-                token = TokenDef(tokenName, keyword)
-                text = text[len(keyword):]
-            
-        return (text, token)
-
-class LiteralTokenMatcher(TokenMatcher):
-    def __init__(self, delimitter, tokenName):
-        self._delimitter = delimitter
-        self._tokenName = tokenName
-
-    def lexNext(self, text): # return: (text, TokenDef|None)
-        token = None
-        if text[0] == self._delimitter:
-            end = False
-            index = 0
-            while not end:
-                index += 1
-                if text[index] == self._delimitter:
-                    end = True
-            literal = text[0:index + 1]
-            token = TokenDef(self._tokenName, literal)
-            text = text[len(literal):]
-        return (text, token)
-
-class RegexMatcher(TokenMatcher):
-    def __init__(self, pattern, tokenName, groupNo=0):
-        self._pattern = pattern
-        self._tokenName = tokenName
-        self._groupNo = groupNo
-
-    def lexNext(self, text): # return: (text, TokenDef|None)
-        token = None
-        rematch = re.match(self._pattern, text)
-        if rematch != None:
-            matchedText = rematch.group(self._groupNo)
-            token = TokenDef(self._tokenName, matchedText)
-            text = text[len(matchedText):]
-        return (text, token)
-        
-class DirectTokenMatcher(TokenMatcher):
-    def __init__(self, directTexts, tokenName):
-        if type(directTexts) == str:
-            directTexts = [directTexts]
-        self._directTexts = directTexts
-        self._tokenName = tokenName
-
-    def lexNext(self, text): # return: (text, TokenDef|None)
-        token = None
-        for directText in self._directTexts:
-            if text[0:len(directText)] == directText:
-                token = TokenDef(self._tokenName, directText)
-                text = text[len(directText):]
-                break
-        return (text, token)

@@ -44,7 +44,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
     def closeFile(self):
         self.filePath = None
-        self.setWindowTitle("[No file] - qtEdit")
+        self.setWindowTitle("[No file] - adEdit")
         self.hashOnDisk = ""
         self.lengthOnDisk = 0
         
@@ -87,12 +87,12 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         modified = (len(text) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
 
         if modified:
-            self.setWindowTitle("* %s (%s) - qtEdit" % (
+            self.setWindowTitle("* %s (%s) - adEdit" % (
                 basename(self.filePath), 
                 dirname(self.filePath)
             ))
         else:
-            self.setWindowTitle("%s (%s) - qtEdit" % (
+            self.setWindowTitle("%s (%s) - adEdit" % (
                 basename(self.filePath), 
                 dirname(self.filePath)
             ))

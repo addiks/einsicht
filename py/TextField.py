@@ -15,13 +15,28 @@ class TextField(QtWidgets.QPlainTextEdit):
         
         self.updateRequest.connect(self.onUpdateRequest)
         self.textChanged.connect(self.onTextChanged)
+        self.selectionChanged.connect(self.onSelectionChanged)
+#        self.set
         
+        self.document().contentsChange.connect(self.onContentChange)
+
     def onUpdateRequest(self, rect, dy):
         # print([rect, dy])
         self.parent.onUpdate(rect, dy)
         
     def onTextChanged(self):
         self.parent.onTextChanged()
+
+    def onSelectionChanged(self):
+        pass
+
+    def onContentChange(self, position, removed, added):
+        print([position, removed, added])
+
+        if added > 0:
+            text = self.document().toPlainText()[position:position+added]
+            print(text)
+
         
     def contentWidth(self):
         doc = self.document()

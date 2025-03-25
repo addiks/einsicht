@@ -20,6 +20,11 @@ class TextField(QtWidgets.QPlainTextEdit):
         
         self.document().contentsChange.connect(self.onContentChange)
 
+    def insertTextAt(self, position, text):
+        cursor = QtGui.QTextCursor(self.document())
+        cursor.setPosition(position, QtGui.QTextCursor.MoveAnchor)
+        cursor.insertText(text)
+
     def onUpdateRequest(self, rect, dy):
         # print([rect, dy])
         self.parent.onUpdate(rect, dy)
@@ -34,9 +39,11 @@ class TextField(QtWidgets.QPlainTextEdit):
         print([position, removed, added])
 
         if added > 0:
-            text = self.document().toPlainText()[position:position+added]
-            print(text)
-
+            self.parent.onTextInserted( 
+                self.document().toPlainText(),
+                position,
+                added
+            )
         
     def contentWidth(self):
         doc = self.document()

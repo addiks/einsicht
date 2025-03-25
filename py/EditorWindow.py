@@ -5,6 +5,7 @@ from PySide6.QtCore import QTimer
 import subprocess
 import os
 import hashlib
+import re
 
 from py.TextField import TextField
 from py.LineNumbers import LineNumbers
@@ -139,7 +140,22 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.syntaxTree = self.language.parse(text)
         if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
             self.highlighter.updateSyntaxTree(self.syntaxTree)
-        
+
+    def onTextInserted(self, text, position, added):
+        inserted = text[position:position+added]
+
+        if inserted == "\n":
+           lines = text.split("\n")
+           lineNumber = text[:position].count("\n")
+           
+           oldLine = lines[lineNumber]
+
+           indentionMatch = re.match(r'^(\s+)[^\s]?', oldLine)
+
+           if indentionMatch != None:
+               indention = indentionMatch.group(1)
+               self.textField.insertTextAt(position+added, indention)
+
     def showOpenFilePicker(self):
         print('showOpenFilePicker')
         
@@ -152,9 +168,12 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         print(filePath)
         
-        bashScript = "/home/gerrit/workspace/Privat/qtEdit/run.sh"
+        bashScript = "/home/gerrit/workspace/Privat/adEdit/run.sh"
         
         os.system(f"nohup {bashScript} '{filePath}' 2>&1 > {bashScript}.log")
+        
+    def openGitGui(self):
+        os.system(f"git gui")
         
     def _afterTextChanged(self):
         self.setMinimumWidth(0)
@@ -182,6 +201,11 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         quitAction.setShortcut('Ctrl+Q')
         quitAction.setStatusTip('Quit')
         quitAction.triggered.connect(self.close)
+        
+        gitMenu = menuBar.addMenu('Git')
+        
+        gitGuiAction = gitMenu.addAction('git gui')
+        gitGuiAction.triggered.connect(self.openGitGui)
         
         self.setMenuBar(menuBar)
         

@@ -1,7 +1,7 @@
 
 from PySide6 import QtCore, QtWidgets, QtGui
 
-# https://stackoverflow.com/questions/50074155/how-to-add-line-number-in-this-texteditor
+# https://stackoverflow.com/questions/50074155
 
 class LineNumbers(QtWidgets.QWidget):
     
@@ -12,7 +12,7 @@ class LineNumbers(QtWidgets.QWidget):
         # self.editor.textField.updateRequest.connect(self.update)
         
     def sizeHint(self):
-        return QtCore.QSize(20, 0);
+        return QtCore.QSize(30, 0);
         
     def onUpdate(self, rect, dy):
         self.update()

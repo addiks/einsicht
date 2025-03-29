@@ -1,4 +1,5 @@
 
+import math 
 from PySide6 import QtCore, QtWidgets, QtGui
 
 # https://stackoverflow.com/questions/50074155
@@ -12,10 +13,17 @@ class LineNumbers(QtWidgets.QWidget):
         # self.editor.textField.updateRequest.connect(self.update)
         
     def sizeHint(self):
-        return QtCore.QSize(30, 0);
+        text = self.editor.fileContent
+    	
+        lineCount = text.count("\n") + 1
+    	
+        charWidth = math.ceil(math.log(lineCount + 1, 10))
+    
+        return QtCore.QSize(charWidth * 10, 0);
         
     def onUpdate(self, rect, dy):
         self.update()
+        self.updateGeometry()
         
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)

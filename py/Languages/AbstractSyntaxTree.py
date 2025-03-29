@@ -29,6 +29,8 @@ class NodeSequence(NodePattern):
 
     def matches(self, nodes):
         for pattern in self._elements:
+            if len(nodes) <= 0:
+                break
             if not pattern.matches(nodes):
                 return False
             else:
@@ -41,6 +43,8 @@ class NodeSequence(NodePattern):
         newNodes = []
         success = False
         for pattern in self._elements:
+            if len(nodes) <= 0:
+                break
             if not pattern.matches(nodes):
                 success = False
                 break

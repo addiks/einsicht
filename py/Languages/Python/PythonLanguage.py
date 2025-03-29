@@ -14,7 +14,10 @@ from ..SemanticASTNodes import ImportNode, AsImportNode
 from collections import OrderedDict
 
 class PythonLanguage(Language):
-
+    
+    def name(self):
+        return "Python"
+    
     def tokenMatchers(self): # list<TokenMatcher>
         return [
             KeywordsTokenMatcher([
@@ -25,7 +28,7 @@ class PythonLanguage(Language):
                 "raise", "except", "try",
                 "while", "for",
                 "True", "False", "None",
-                "and", "or", "xor"
+                "and", "or", "xor", "not"
             ], self),
             RegexMatcher(r'\n +', "T_INDENTATION"),
             RegexMatcher(r'\s+', "T_WHITESPACE"),
@@ -82,8 +85,6 @@ class PythonLanguage(Language):
             ]), True)
         ]))
 
-        print([importStatement, identifierStatement])
-
         grammar = RepeatingNode(NodeBranch([
             importStatement,
             identifierStatement
@@ -106,7 +107,7 @@ class PythonLanguage(Language):
                 "T_ASSERT",
                 "T_WHILE", "T_FOR",
                 "T_TRY", "T_CATCH", "T_EXCEPT",
-                "T_AND", "T_OR", "T_XOR"
+                "T_AND", "T_OR", "T_XOR", "T_NOT"
             ]:
                 format.setFontWeight(QFont.Bold)
                 format.setForeground(Qt.darkMagenta)

@@ -18,13 +18,13 @@ class LanguageSelector:
         return self.selectForMimeType(mimeType)
         
     def selectForMimeType(self, mimeType):
-        print(mimeType)
-        
         if mimeType == "text/x-python":
             return PythonLanguage()
         
         if mimeType == "text/php":
             return PHPLanguage()
+        
+        print(mimeType)
         
         [category, subcategory] = mimeType.split("/")
         print(category)

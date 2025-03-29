@@ -43,9 +43,10 @@ class KeywordsTokenMatcher(TokenMatcher):
         token = None
         for keyword in self._keywords:
             if text[0:len(keyword)].upper() == keyword.upper():
-                tokenName = "T_" + keyword.upper()
-                token = TokenDef(tokenName, keyword)
-                text = text[len(keyword):]
+                if not text[len(keyword):len(keyword)+1].isidentifier():
+                    tokenName = "T_" + keyword.upper()
+                    token = TokenDef(tokenName, keyword)
+                    text = text[len(keyword):]
             
         return (text, token)
 
@@ -61,7 +62,7 @@ class LiteralTokenMatcher(TokenMatcher):
             index = 0
             while not end:
                 index += 1
-                if text[index] == self._delimitter:
+                if index >= len(text) or text[index] == self._delimitter:
                     end = True
             literal = text[0:index + 1]
             token = TokenDef(self._tokenName, literal)

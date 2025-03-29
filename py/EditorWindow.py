@@ -2,13 +2,14 @@
 from PySide6 import QtCore, QtWidgets, QtGui
 from os.path import basename, dirname, abspath
 from PySide6.QtCore import QTimer
+
 import subprocess
 import os
 import hashlib
 import re
 
-from py.TextField import TextField
-from py.LineNumbers import LineNumbers
+from py.Widgets.TextField import TextField
+from py.Widgets.LineNumbers import LineNumbers
 from py.MessageBroker import MessageBroker
 from py.Languages.LanguageSelector import LanguageSelector
 from py.Languages.Language import Language, LanguageFromSyntaxTreeHighlighter
@@ -44,6 +45,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         firstUpdate.start()
         
     def closeFile(self):
+        self.fileContent = ""
         self.filePath = None
         self.setWindowTitle("[No file] - adEdit")
         self.hashOnDisk = ""
@@ -59,33 +61,30 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.language = selector.selectForFilePath(self.filePath)
         
         handle = open(self.filePath, "r")
-        text = handle.read()
+        self.fileContent = handle.read()
 
         if self.language != None:
             assert isinstance(self.language, Language)
-            self.syntaxTree = self.language.parse(text)
+            self.syntaxTree = self.language.parse(self.fileContent)
             self.highlighter = self.language.syntaxHighlighter(document, self.syntaxTree)
         
-        self.hashOnDisk = hashlib.md5(text.encode()).hexdigest()
-        self.lengthOnDisk = len(text)
+        self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
+        self.lengthOnDisk = len(self.fileContent)
         
-        document.setPlainText(text)
+        document.setPlainText(self.fileContent)
         
         self.updateTitle()
         
     def saveFile(self):
-        text = self.textField.document().toPlainText()
-        
         handle = open(self.filePath, "w")
-        handle.write(text)
-        self.hashOnDisk = hashlib.md5(text.encode()).hexdigest()
-        self.lengthOnDisk = len(text)
+        handle.write(self.fileContent)
+        self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
+        self.lengthOnDisk = len(self.fileContent)
         self.updateTitle()
 
     def updateTitle(self):
-        text = self.textField.document().toPlainText()
-        textHash = hashlib.md5(text.encode()).hexdigest()
-        modified = (len(text) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
+        textHash = hashlib.md5(self.fileContent.encode()).hexdigest()
+        modified = (len(self.fileContent) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
 
         if modified:
             self.setWindowTitle("* %s (%s) - adEdit" % (
@@ -106,6 +105,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.lineNumbers.onUpdate(rect, dy)
         
     def onTextChanged(self):
+        self.fileContent = self.textField.document().toPlainText()
         self.updateTitle()
         contentWidth = self.textField.contentWidth()
         contentHeight = self.textField.contentHeight()
@@ -116,7 +116,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         contentWidth = max(contentWidth, 275)
         contentHeight = max(contentHeight, 150)
         
-        print([contentWidth, contentHeight])
+        # print([contentWidth, contentHeight])
         
         self.setMinimumWidth(contentWidth)
         self.setMinimumHeight(contentHeight)
@@ -155,18 +155,18 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
            if indentionMatch != None:
                indention = indentionMatch.group(1)
                self.textField.insertTextAt(position+added, indention)
-
+               
+    def onSelectionChanged(self, position, anchor, text):
+        if self.highlighter != None:
+            self.highlighter.updateSelection(text)
+            
     def showOpenFilePicker(self):
-        print('showOpenFilePicker')
-        
         (filePath, fileTypeDescr) = QtWidgets.QFileDialog.getOpenFileName(
             self, 
             "Open File", 
             dirname(self.filePath),
             "Text files (*.*)"
         )
-        
-        print(filePath)
         
         bashScript = "/home/gerrit/workspace/Privat/adEdit/run.sh"
         
@@ -184,7 +184,9 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     def _initMenu(self):
         
         menuBar = self.menuBar()
-        
+
+        ########
+        ### FILE
         fileMenu = menuBar.addMenu('File')
         
         openAction = fileMenu.addAction('Open')
@@ -202,12 +204,46 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         quitAction.setStatusTip('Quit')
         quitAction.triggered.connect(self.close)
         
+        ########
+        ### EDIT
+        editMenu = menuBar.addMenu('Edit')
+        
+        deleteLineAction = editMenu.addAction('Delete line')
+        deleteLineAction.setShortcut('Ctrl+D')
+        deleteLineAction.triggered.connect(self.textField.deleteCurrentLines)
+
+        indentInAction = editMenu.addAction('Indent in')
+        indentInAction.triggered.connect(self.textField.indentIn)
+
+        indentOutAction = editMenu.addAction('Indent out')
+        indentOutAction.triggered.connect(self.textField.indentOut)
+
+        ##########
+        ### SEARCH
+        searchMenu = menuBar.addMenu('Search')
+        
+        searchInFileAction = searchMenu.addAction('Search in this File')
+        
+        replaceInFileAction = searchMenu.addAction('Replace Text in this File')
+        
+        searchInProjectAction = searchMenu.addAction('Search in Project')
+        
+        #######
+        ### GIT
         gitMenu = menuBar.addMenu('Git')
         
         gitGuiAction = gitMenu.addAction('git gui')
         gitGuiAction.triggered.connect(self.openGitGui)
         
+        #############
+        ### DEBUGGING
+        debuggingMenu = menuBar.addMenu('Debugging')
+        
         self.setMenuBar(menuBar)
         
         menuBar.show()
         
+        ############
+        ### LANGUAGE
+        if self.language != None:
+            languageMenu = menuBar.addMenu(self.language.name())

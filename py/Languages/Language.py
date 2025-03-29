@@ -1,5 +1,7 @@
 
-from PySide6.QtGui import QSyntaxHighlighter
+from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat
+from PySide6.QtCore import Qt
+
 from collections import OrderedDict
 import re, hashlib
 
@@ -11,6 +13,9 @@ class Language: # abstract
     def __init__(self):
         self._lexCache = {}
         self._parseCache = {}
+        
+    def name(self):
+        raise NotImplementedError
     
     # Returns QSyntaxHighlighter
     def syntaxHighlighter(self, document, syntaxTree):
@@ -161,16 +166,34 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
         super().__init__(document)
         self.syntaxTree = syntaxTree
         self.language = language
+        self._selection = ""
 
     def updateSyntaxTree(self, syntaxTree):
         if self.syntaxTree != syntaxTree:
             self.syntaxTree = syntaxTree
+            self.rehighlight()
+            
+    def updateSelection(self, selection):
+        if self._selection != selection:
+            self._selection = selection
             self.rehighlight()
 
     def highlightBlock(self, text):
         block = self.currentBlock()
         self._line = block.firstLineNumber() + 1
         self.highlightAstNode(self.syntaxTree, len(text))
+        
+        if len(self._selection) > 0:
+            format = QTextCharFormat()
+            format.setBackground(Qt.yellow)
+            offset = 0
+            while True:
+                pos = text.find(self._selection, offset)
+                if pos >= 0:
+                    self.setFormat(pos, len(self._selection), format)
+                    offset = pos + len(self._selection)
+                else:
+                    break
 
     def highlightAstNode(self, node, length):
         if node.row == self._line:

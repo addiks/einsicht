@@ -13,7 +13,7 @@ class MessageBroker(QtCore.QObject):
     def __init__(self, editorWindow):
         super().__init__(editorWindow)
         
-        filePath = editorWindow.filePath
+        filePath = editorWindow.filePath		
         
         self.serviceName = "de.addiks.qtedit.file_" + hashlib.md5(filePath.encode('UTF-8')).hexdigest()
         self.editorWindow = editorWindow

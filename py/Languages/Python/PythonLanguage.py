@@ -4,12 +4,13 @@ from PySide6.QtCore import QRegularExpression, Qt
 
 from ..Language import Language
 
-from ..AbstractSyntaxTree import OptionalNode, NodeSequence, RepeatingNode, NodeBranch, NodesAsASTBranch
+from ..ASTPatterns import OptionalNode, NodeSequence, RepeatingNode
+from ..ASTPatterns import NodeBranch, LateDefinedASTPattern
 
-from ..Tokens import Token, KeywordsTokenMatcher, RegexMatcher, DirectTokenMatcher, LiteralTokenMatcher
-from ..Tokens import TokenNodePattern
+from ..Tokens import Token, KeywordsTokenMatcher, RegexMatcher
+from ..Tokens import DirectTokenMatcher, LiteralTokenMatcher, TokenNodePattern
 
-from ..SemanticASTNodes import ImportNode, AsImportNode
+from ..SemanticASTNodes import CodeBlock, ImportNode, AsImportNode
 
 from collections import OrderedDict
 
@@ -28,12 +29,14 @@ class PythonLanguage(Language):
                 "raise", "except", "try",
                 "while", "for",
                 "True", "False", "None",
-                "and", "or", "xor", "not"
+                "and", "or", "xor", "not",
+                "del", "as", "in", "breakpoint"
             ], self),
-            RegexMatcher(r'\n +', "T_INDENTATION"),
+            #RegexMatcher(r'\n+', "T_WHITESPACE"),
+            RegexMatcher(r'\n( +)?', "T_INDENTATION"),
+            #RegexMatcher(r'\s+', "T_WHITESPACE"),
             RegexMatcher(r'\s+', "T_WHITESPACE"),
-            RegexMatcher(r'\s+', "T_WHITESPACE"),
-                DirectTokenMatcher("@", "T_DECORATOR"),
+            DirectTokenMatcher("@", "T_DECORATOR"),
             RegexMatcher(r'[a-zA-Z0-9_]+', "T_SYMBOL"),
             RegexMatcher(r'\#([^\n]*)', "T_COMMENT"),
             DirectTokenMatcher([
@@ -55,42 +58,109 @@ class PythonLanguage(Language):
 
     def grammar(self):
         
-        #return NodeSequence([
+        #return [NodeSequence("test", [
         #    TokenNodePattern("T_FROM"),
         #    TokenNodePattern("T_SYMBOL")
-        #])
+        #])]
+        
+        # return [RepeatingNode("test", TokenNodePattern("T_INDENTATION"), False)]
+        
+        expression = LateDefinedASTPattern()
 
-        identifierStatement = NodesAsASTBranch("import", 
-            NodeSequence([
-                TokenNodePattern("T_SYMBOL"),
-                RepeatingNode(NodeSequence([
-                    TokenNodePattern("."),
-                    TokenNodePattern("T_SYMBOL")
-                ]), True)
-            ]),
-            #lambda node : node.find(""), # resource TODO
-            #lambda node : node.find("") # alias TODO
-        )
-
-        importStatement = NodesAsASTBranch("import", NodeSequence([
-            OptionalNode(NodeSequence([
-                TokenNodePattern("T_FROM"),
-                TokenNodePattern("T_SYMBOL")
-            ])),
-            TokenNodePattern("T_IMPORT"),
+        identifier = NodeSequence("identifier", [
             TokenNodePattern("T_SYMBOL"),
-            RepeatingNode(NodeSequence([
-                TokenNodePattern(","),
+            RepeatingNode("identifier-path", NodeSequence("identifier-element", [
+                TokenNodePattern("."),
                 TokenNodePattern("T_SYMBOL")
             ]), True)
+        ])
+        
+        importFrom = NodeSequence("import-from", [
+            TokenNodePattern("T_FROM"),
+            RepeatingNode("import-from-parent", TokenNodePattern("."), True),
+            identifier
+        ])
+
+        importStatement = NodeSequence("import", [
+            OptionalNode(importFrom),
+            TokenNodePattern("T_IMPORT"),
+            identifier
+        ])
+        
+        tuple = NodeSequence("tuple", [
+            TokenNodePattern("("),
+            RepeatingNode("tuple-content", NodeSequence("tuple-element", [
+                expression,
+                OptionalNode(TokenNodePattern(","))
+            ]), True),
+            TokenNodePattern(")")
+        ])
+        
+        call = NodeSequence("call", [
+            identifier,
+            tuple
+        ])
+        
+        decorator = NodeSequence("decorator", [
+            TokenNodePattern("@"),
+            identifier,
+            OptionalNode(tuple)
+        ])
+        
+        operation = NodeSequence("operation", [
+            expression,
+            TokenNodePattern("T_OPERATOR"),
+            expression
+        ])
+        
+        assignment = NodeSequence("assignment", [
+            expression,
+            TokenNodePattern("="),
+            expression
+        ])
+        
+        expression.definePattern(NodeBranch("expression", [
+            identifier,
+            call,
+            TokenNodePattern("T_LITERAL"),
+            operation
         ]))
-
-        grammar = RepeatingNode(NodeBranch([
+        
+        return [
             importStatement,
-            identifierStatement
-        ]), False)
+            importFrom,
+            identifier,
+            tuple,
+            call,
+            decorator,
+            operation,
+            assignment,
+            expression
+        ]
 
-        return grammar
+    def groupStatementsIntoBlocks(self, nodes): # list<ASTNode>
+        level = 0
+        currentIndentation = 0
+        stack = [CodeBlock(self, 1, 1, 0)]
+        depthStack = [0]
+        for node in nodes:
+            if isinstance(node, Token) and node.tokenName == "T_INDENTATION":
+                currentIndentation = node.code.count(" ")
+                if currentIndentation > level:
+                    level = currentIndentation
+                    stack.append(CodeBlock(self, node.row, node.col, node.offset))
+                    depthStack.append(level)
+                elif currentIndentation < level:
+                    while currentIndentation < level:
+                        endedBlock = stack.pop()
+                        depthStack.pop()
+                        level = depthStack[-1]
+                        stack[-1].addStatement(endedBlock)
+            stack[-1].addStatement(node)
+        while len(stack) > 1:
+            block = stack.pop()
+            stack[-1].addStatement(block)
+        return stack[0].children
 
     def formatForNode(self, node):
         if type(node) == Token: 

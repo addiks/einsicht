@@ -1,7 +1,8 @@
 
 import re
 
-from .AbstractSyntaxTree import ASTNode, NodePattern
+from .AbstractSyntaxTree import ASTNode
+from .ASTPatterns import NodePattern
 
 ### TOKENS
 
@@ -13,6 +14,9 @@ class Token(ASTNode):
     def __repr__(self):
         return "<[%d,%d]:%s:'%s'>" % (self.row, self.col, self.tokenName, self.code)
         
+    def grammarKey(self):
+        return self.tokenName
+
 class TokenDef:
     def __init__(self, tokenName, code):
         self.tokenName = tokenName
@@ -106,21 +110,25 @@ class TokenNodePattern(NodePattern):
     def __init__(self, tokenName):
         self._tokenName = tokenName
 
-    def matches(self, nodes):
-        node = nodes[0]
+    def nodeKeys(self): # string
+        return [self._tokenName]
+        
+    def producedNodeKey(self): # string
+        return self._tokenName
+        
+    def matches(self, nodes, index):
+        node = nodes[index]
         expected = self._tokenName
         # print("AJND", node, self._tokenName, node.tokenName == expected, node.code == expected)
-        if type(node) == Token:
+        if isinstance(node, Token):
+            #print([node.tokenName, node.code, expected, node.tokenName == expected, node.code == expected, node.tokenName == expected or node.code == expected])
             return node.tokenName == expected or node.code == expected
         return False
-
-    def consume(self, nodes):
-        success = False
-        newNodes = []
-
-        if self.matches(nodes):
-            success = True
-            newNodes.append(nodes.pop(0))
-
-        return (success, nodes, newNodes)
-
+        
+    def mutate(self, nodes, index):
+        node = nodes[index]
+        assert isinstance(node, Token)
+        expected = self._tokenName
+        assert node.tokenName == expected or node.code == expected
+        return ([], index) # No mutation needed, the node is already the token
+        

@@ -1,5 +1,18 @@
 
-from .AbstractSyntaxTree import ASTNode, ASTBranch, NodePattern
+from .AbstractSyntaxTree import ASTNode, ASTBranch
+from .ASTPatterns import NodePattern
+
+class CodeBlock(ASTNode):
+    def __init__(self, language, row, col, offset):
+        super().__init__(language, "", row, col, offset, "block")
+
+    def addStatement(self, statement):
+        assert isinstance(statement, ASTNode)
+        self.children.append(statement)
+        self.code += statement.reconstructCode()
+        
+    def find(self, selector):
+        pass
 
 class ImportNode(ASTNode):
     def __init__(self, node, resource, alias):

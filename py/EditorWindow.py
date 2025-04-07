@@ -13,6 +13,7 @@ from py.Widgets.LineNumbers import LineNumbers
 from py.MessageBroker import MessageBroker
 from py.Languages.LanguageSelector import LanguageSelector
 from py.Languages.Language import Language, LanguageFromSyntaxTreeHighlighter
+from py.Versioning.VersioningSelector import VersioningSelector
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
@@ -21,6 +22,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         self.lineNumbers = LineNumbers(self)
         self.textField = TextField(self)
+        self._versioningSelector = VersioningSelector()
         
         self.messageBroker = None
         
@@ -50,6 +52,9 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.setWindowTitle("[No file] - adEdit")
         self.hashOnDisk = ""
         self.lengthOnDisk = 0
+        self.versioning = None
+        self.tokens = None
+        self.syntaxTree = None
         
     def openFile(self, filePath):
         self.filePath = abspath(filePath)
@@ -65,8 +70,10 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
         if self.language != None:
             assert isinstance(self.language, Language)
-            self.syntaxTree = self.language.parse(self.fileContent)
+            (self.syntaxTree, self.tokens) = self.language.parse(self.fileContent, None, None)
             self.highlighter = self.language.syntaxHighlighter(document, self.syntaxTree)
+        
+        self.versioning = self._versioningSelector.selectVersioningFor(self.filePath)
         
         self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
         self.lengthOnDisk = len(self.fileContent)
@@ -105,8 +112,23 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.lineNumbers.onUpdate(rect, dy)
         
     def onTextChanged(self):
-        self.fileContent = self.textField.document().toPlainText()
+        doc = self.textField.document()
+        cursor = self.textField.textCursor()
+        
+        self.fileContent = doc.toPlainText()
         self.updateTitle()
+        self._updateDimensions()
+        
+        if self.language != None:
+            (self.syntaxTree, self.tokens) = self.language.parse(self.fileContent, self.syntaxTree, self.tokens)
+            if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
+                self.highlighter.updateSyntaxTree(self.syntaxTree)
+            
+            if self.tokens != None:
+                token = self.tokenAt(cursor.position())
+                print(token)
+            
+    def _updateDimensions(self):
         contentWidth = self.textField.contentWidth()
         contentHeight = self.textField.contentHeight()
         
@@ -129,17 +151,11 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             
         self.setMaximumWidth(contentWidth)
         self.setMaximumHeight(contentHeight)
-        
+
         afterUpdate = QTimer()
         afterUpdate.setInterval(10)
         afterUpdate.timeout.connect(self._afterTextChanged)
         afterUpdate.start()
-
-        text = self.textField.document().toPlainText()
-
-        self.syntaxTree = self.language.parse(text)
-        if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
-            self.highlighter.updateSyntaxTree(self.syntaxTree)
 
     def onTextInserted(self, text, position, added):
         inserted = text[position:position+added]
@@ -168,18 +184,24 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             "Text files (*.*)"
         )
         
-        bashScript = "/home/gerrit/workspace/Privat/adEdit/run.sh"
+        bashScript = "/home/gerrit/workspace/Privat/adEdit/bin/adedit.sh"
         
         os.system(f"nohup {bashScript} '{filePath}' 2>&1 > {bashScript}.log")
         
-    def openGitGui(self):
-        os.system(f"git gui")
+    def tokenAt(self, position):
+        for token in self.tokens:
+            if token.offset < position and (token.offset + len(token.code)) >= position:
+                return token
+        return None
         
     def _afterTextChanged(self):
         self.setMinimumWidth(0)
         self.setMinimumHeight(0)
         self.setMaximumWidth(16777215)
         self.setMaximumHeight(16777215)
+        
+    def _toggleFileSearch(self):
+        print("*_toggleFileSearch*")
         
     def _initMenu(self):
         
@@ -218,22 +240,29 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         indentOutAction = editMenu.addAction('Indent out')
         indentOutAction.triggered.connect(self.textField.indentOut)
 
+        replaceInFileAction = editMenu.addAction('Search and Replace')
+        
         ##########
         ### SEARCH
         searchMenu = menuBar.addMenu('Search')
         
         searchInFileAction = searchMenu.addAction('Search in this File')
+        searchInFileAction.setShortcut('Ctrl+F')
+        searchInFileAction.triggered.connect(self._toggleFileSearch)
         
-        replaceInFileAction = searchMenu.addAction('Replace Text in this File')
+        searchInOpenFilesAction = searchMenu.addAction('Search in all open Files')
+        searchInOpenFilesAction.setShortcut('Ctrl+Shift+F')
         
-        searchInProjectAction = searchMenu.addAction('Search in Project')
+        searchInProjectAction = searchMenu.addAction('Search in Project-Index')
+        searchInProjectAction.setShortcut('Ctrl+Alt+F')
         
-        #######
-        ### GIT
-        gitMenu = menuBar.addMenu('Git')
-        
-        gitGuiAction = gitMenu.addAction('git gui')
-        gitGuiAction.triggered.connect(self.openGitGui)
+        ##############
+        ### VERSIONING
+        if self.versioning != None:
+            versioningMenu = menuBar.addMenu(self.versioning.name())
+            
+            versioningGuiAction = versioningMenu.addAction('Open UI')
+            versioningGuiAction.triggered.connect(self.versioning.openUI)
         
         #############
         ### DEBUGGING

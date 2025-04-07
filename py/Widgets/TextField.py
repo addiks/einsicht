@@ -16,7 +16,6 @@ class TextField(QtWidgets.QPlainTextEdit):
         self.updateRequest.connect(self.onUpdateRequest)
         self.textChanged.connect(self.onTextChanged)
         self.selectionChanged.connect(self.onSelectionChanged)
-#        self.set
         
         self.document().contentsChange.connect(self.onContentChange)
 
@@ -52,13 +51,13 @@ class TextField(QtWidgets.QPlainTextEdit):
             editCursor = QtGui.QTextCursor(doc)
             
             block = doc.findBlock(anchor)
-            editCursor.setPosition(block.position())
-            editCursor.insertText(''.ljust(4))
+            #editCursor.setPosition(block.position())
+            #editCursor.insertText(''.ljust(4))
             
             while block.position() < position:
-                block = block.next()
                 editCursor.setPosition(block.position())
                 editCursor.insertText(''.ljust(4))
+                block = block.next()
 
     def indentOut(self):
         cursor = self.textCursor()
@@ -87,15 +86,15 @@ class TextField(QtWidgets.QPlainTextEdit):
             editCursor = QtGui.QTextCursor(doc)
             
             block = doc.findBlock(anchor)
-            editCursor.setPosition(block.position())
-            for i in range(0, 4):
-                editCursor.deleteChar()
+            #editCursor.setPosition(block.position())
+            #for i in range(0, 4):
+            #    editCursor.deleteChar()
             
             while block.position() < position:
-                block = block.next()
                 editCursor.setPosition(block.position())
                 for i in range(0, 4):
                     editCursor.deleteChar()
+                block = block.next()
  
     def deleteCurrentLines(self):
         cursor = self.textCursor()
@@ -162,9 +161,6 @@ class TextField(QtWidgets.QPlainTextEdit):
         return doc.lineCount() * charHeight + 32
 
     def keyPressEvent(self, event):
-        # print("keyPressEvent")
-        # print(event.key())
-        # print(event.keyCombination().keyboardModifiers())
         if event.key() == QtCore.Qt.Key_Tab:
             self.indentIn()
             return True
@@ -174,5 +170,4 @@ class TextField(QtWidgets.QPlainTextEdit):
         return super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
-        # print("keyReleaseEvent")
         return super().keyReleaseEvent(event)

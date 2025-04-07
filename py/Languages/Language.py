@@ -5,7 +5,8 @@ from PySide6.QtCore import Qt
 from collections import OrderedDict
 import re, hashlib
 
-from .AbstractSyntaxTree import ASTNode, ASTBranch, NodePattern
+from .AbstractSyntaxTree import ASTNode, ASTBranch
+from .ASTPatterns import NodePattern
 from .Tokens import Token, TokenMatcher, TokenDef
 
 class Language: # abstract
@@ -13,6 +14,7 @@ class Language: # abstract
     def __init__(self):
         self._lexCache = {}
         self._parseCache = {}
+        self._grammarMap = None
         
     def name(self):
         raise NotImplementedError
@@ -27,57 +29,98 @@ class Language: # abstract
     def grammar(self): # NodePattern
         raise NotImplementedError
 
+    def groupStatementsIntoBlocks(self, nodes): # list<ASTNode>
+        return nodes
+
     def formatForNode(self, node): # QFormat
         raise NotImplementedError
 
     def isNodeRelevantForGrammar(self, node): # boolean
         raise NotImplementedError
 
-    def parse(self, code): # return: ASTNode
+    def parse(self, code, previousAST, previousTokens): # return: [ASTNode, list(TokenNode)]
         hash = hashlib.md5(code.encode()).hexdigest()
         if hash not in self._parseCache:
-            tokens = self.lex(code)
+            tokens = self.lex(code, previousTokens)
 
             tokens = self.normalize(tokens)
-
-            #for token in tokens:
-            #    print([token.row, token.col, token.tokenName, token.code])
-
-            grammar = self.grammar()
-            assert isinstance(grammar, NodePattern)
-
-            nodes = []
-            nodesToProcess = tokens
-            while len(nodesToProcess) > 0:
-                if grammar.matches(nodesToProcess):
-                    (success, remainingNodes, newNodes) = grammar.consume(nodesToProcess)
-                    # print([success, remainingNodes, newNodes])
-                    if success:
-                        nodes = nodes + newNodes
-                        nodesToProcess = remainingNodes
-                    else:
-                        nodes.append(nodesToProcess.pop(0))
-                else:
-                    nodes.append(nodesToProcess.pop(0))
+            
+            nodeMap = {}
+            #for index, token in tokens.items():
+            
+            for index in range(0, len(tokens)):
+                token = tokens[index]
                 
-
-
-            # nodes = tokens
-            #if grammar.matches(tokens):
-            #    (success, remainingNodes, newNodes) = grammar.consume(tokens)
-            #    print([success, remainingNodes, newNodes])
-            #    if success:
-            #        nodes = newNodes + remainingNodes
-
-            #for node in nodes:
-            #    if type(node) == Token:
-            #        print([node.row, node.col, node.tokenName, node.code])
-            #    else:
-            #        print([node.row, node.col, node.type, node.code])
-
-            self._parseCache[hash] = ASTBranch(nodes, "root")
+                if token.tokenName not in nodeMap:
+                    nodeMap[token.tokenName] = []
+                nodeMap[token.tokenName].append(token)
+                
+                if token.code not in nodeMap:
+                    nodeMap[token.code] = []
+                nodeMap[token.code].append(token)
+            
+            nodes = tokens.copy()
+            
+            dumpAST(nodes)
+            
+            grammarMap = self.grammarMap()
+            while len(nodeMap) > 0:
+                hasMutated = False
+                #print("###")
+                for nodeKey in nodeMap.copy().keys():
+                    #print(["#", len(nodeMap), nodeKey])
+                    if nodeKey in grammarMap:
+                    
+                        #print(" Processing nodes of " + nodeKey)
+                    
+                        for node in nodeMap[nodeKey].copy():
+                            for pattern in grammarMap[nodeKey]:
+                                
+                                nodeIndex = node.offsetIn(nodes)
+                                if nodeIndex == None:
+                                    break
+                                    
+                                #print(" Trying to match pattern " + pattern.producedNodeKey() + " at node " + str(node))
+                                
+                                if pattern.matches(nodes, nodeIndex):
+                                    #print("MATCH!")
+                                    (replacedNodes, newNodeIndex) = pattern.mutate(nodes, nodeIndex)
+                                    
+                                    #dumpAST(nodes)
+            
+                                    for replacedNode in replacedNodes:
+                                        hasMutated = True
+                                        
+                                        replacedNodeKey = replacedNode.grammarKey()
+                                        nodeMap[replacedNodeKey].remove(replacedNode)
+                                        if len(nodeMap[replacedNodeKey]) <= 0:
+                                            del nodeMap[replacedNodeKey]
+                                            
+                                        if replacedNode.code in nodeMap and replacedNode in nodeMap[replacedNode.code]:
+                                            nodeMap[replacedNode.code].remove(replacedNode)
+                                            if len(nodeMap[replacedNode.code]) <= 0:
+                                                del nodeMap[replacedNode.code]
+                                                
+                                    if newNodeIndex != None:
+                                        hasMutated = True
+                                        newNode = nodes[newNodeIndex]
+                                        newNodeKey = newNode.grammarKey()
+                                        if newNodeKey not in nodeMap:
+                                            nodeMap[newNodeKey] = []
+                                        nodeMap[newNodeKey].append(newNode)
+                    if nodeKey in nodeMap and len(nodeMap[nodeKey]) <= 0:
+                        del nodeMap[nodeKey]
+            
+                if not hasMutated:
+                    break
+                    
+            dumpAST(nodes, depth=1)
+            
+            nodes = self.groupStatementsIntoBlocks(nodes)
+            
+            self._parseCache[hash] = (ASTBranch(nodes, "root"), tokens)
         return self._parseCache[hash]
-
+        
     def normalize(self, tokens):
         index = 0
         while index < len(tokens):
@@ -99,7 +142,8 @@ class Language: # abstract
             index += 1
         return tokens
 
-    def lex(self, code):
+    def lex(self, code, previousTokens):
+        # TODO: re-use data from previousTokens for better performance
         hash = hashlib.md5(code.encode()).hexdigest()
         if hash not in self._lexCache:
             tokens = []
@@ -159,7 +203,21 @@ class Language: # abstract
         else:
             col += processedLength
         return (offset, row, col)
-
+        
+    def grammarMap(self):
+        if self._grammarMap == None:
+            patterns = self.grammar()
+            self._grammarMap = {}
+            for pattern in patterns:
+                assert isinstance(pattern, NodePattern)
+                #print([pattern, pattern.nodeKeys()])
+                for key in pattern.nodeKeys():
+                    #print(key)
+                    if not key in self._grammarMap:
+                        self._grammarMap[key] = []
+                    self._grammarMap[key].append(pattern)
+        return self._grammarMap
+        
 class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
     
     def __init__(self, document, syntaxTree, language):
@@ -211,7 +269,26 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
         for successor in node.appended:
             self.highlightAstNode(successor, length)
 
-        if type(node) == ASTBranch:
-            for child in node.children:
-                self.highlightAstNode(child, length)
+        # if type(node) == ASTBranch:
+        for child in node.children:
+            self.highlightAstNode(child, length)
 
+
+def dumpAST(nodes, level=0, depth=None):
+    if depth == None or level + 1 > depth:
+        return
+    for node in nodes:
+        nodeDescr = "node: " + node.type
+        if isinstance(node, Token):
+            nodeDescr = node.tokenName + " - " + node.code.strip()
+        #elif isinstance(node, ASTBranch)
+        print(
+            str(node.row).rjust(3, "0") + ":" + str(node.col).rjust(3, "0"),
+            "-",
+            "".ljust(level, "|") + nodeDescr,
+            ">",
+            node.code.strip()
+        )
+        dumpAST(node.children, level + 1, depth)
+    if level == 0:
+        print("\n")

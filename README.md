@@ -4,6 +4,15 @@ This is a text-editor built for SDI (Single Document Interface) operations,
 made to be used with modern window-managers that allow for efficient management
 of many SDI windows. 
 
+Note: I have not yet figured out a final name for this editor.
+      There is a ~80% chance that this will be renamed in the near future,
+      I just have not figured out what I want to name it.
+Candidates are:
+* Sdiide (Single-Document-Interface Integrated-Development-Environment)
+* qtedit (A small editor written in QT) 
+* addiks-edit (It's an editor written for and by me)
+* ???
+
 ## Implementation
 This project is written in Python, using Pyside6/Qt6 as the UI framework.
 Every open document runs in it's own process, communication between 
@@ -16,11 +25,11 @@ processes/documents is done using DBUS.
 * Open-only-Once: If you try to open the same file twice, 
   the first window is presented instead
 * Line-Numbers
+* Syntax-Highlighting
+* Highlighting of selected words
 
 Planned **Common** Features:
-* Syntax-Highlighting
 * Git Integration
-* Highlighting of selected words
 * Line-Sorting / -Filtering
 * Formatters / Prettyfiers (JSON / YAML / ...)
 
@@ -79,3 +88,4 @@ like (f.e.: removing menus).
 And instead of taking gedit, suppressing half of the functionality (tabs) and 
 adding other functionality that gedit was never designed for, I decided to just
 build my own minimalist editor.
+I've also looked at kate (too overloaded with unwanted TU: tabs) and kwrite (no extension support).

@@ -7,6 +7,7 @@ import subprocess
 import os
 import hashlib
 import re
+import traceback
 
 from py.Widgets.TextField import TextField
 from py.Widgets.LineNumbers import LineNumbers
@@ -23,6 +24,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.lineNumbers = LineNumbers(self)
         self.textField = TextField(self)
         self._versioningSelector = VersioningSelector()
+        self._textChangeCounter = 0
         
         self.messageBroker = None
         
@@ -41,10 +43,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         self._initMenu()
         
-        firstUpdate = QTimer()
-        firstUpdate.setInterval(10)
-        firstUpdate.timeout.connect(self.onTextChanged)
-        firstUpdate.start()
+        QTimer.singleShot(10, lambda: self.onTextChanged(force=True))
         
     def closeFile(self):
         self.fileContent = ""
@@ -111,23 +110,50 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     def onUpdate(self, rect, dy):
         self.lineNumbers.onUpdate(rect, dy)
         
-    def onTextChanged(self):
+    def onTextChanged(self, force=False):
         doc = self.textField.document()
-        cursor = self.textField.textCursor()
+        fileContent = doc.toPlainText()
         
-        self.fileContent = doc.toPlainText()
+        if fileContent == self.fileContent and not force:
+            return
+        
+        self._textChangeCounter += 1
+        
+        self.fileContent = fileContent
         self.updateTitle()
         self._updateDimensions()
         
+        currentTextChangeCounter = self._textChangeCounter
+        
+        QTimer.singleShot(10, self._afterTextChanged)
+        QTimer.singleShot(250, lambda: self._checkStoppedTyping(currentTextChangeCounter))
+           
+    def _afterTextChanged(self):
+        self.setMinimumWidth(0)
+        self.setMinimumHeight(0)
+        self.setMaximumWidth(16777215)
+        self.setMaximumHeight(16777215)
+        
+    def _checkStoppedTyping(self, textChangeCounter):
+        if textChangeCounter == self._textChangeCounter:
+            self.onStoppedTyping()
+            
+    def onStoppedTyping(self):
         if self.language != None:
             (self.syntaxTree, self.tokens) = self.language.parse(self.fileContent, self.syntaxTree, self.tokens)
             if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
                 self.highlighter.updateSyntaxTree(self.syntaxTree)
             
             if self.tokens != None:
-                token = self.tokenAt(cursor.position())
-                print(token)
-            
+                cursorPos = self.textField.textCursor().position()
+                token = self.tokenAt(cursorPos)
+                if token != None:
+                    tokenPos = cursorPos - token.offset
+                    prefix = token.code[:tokenPos]
+                    postfix = token.code[tokenPos:]
+                    print([prefix, postfix])
+                
+        
     def _updateDimensions(self):
         contentWidth = self.textField.contentWidth()
         contentHeight = self.textField.contentHeight()
@@ -151,11 +177,6 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             
         self.setMaximumWidth(contentWidth)
         self.setMaximumHeight(contentHeight)
-
-        afterUpdate = QTimer()
-        afterUpdate.setInterval(10)
-        afterUpdate.timeout.connect(self._afterTextChanged)
-        afterUpdate.start()
 
     def onTextInserted(self, text, position, added):
         inserted = text[position:position+added]
@@ -186,19 +207,13 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         bashScript = "/home/gerrit/workspace/Privat/adEdit/bin/adedit.sh"
         
-        os.system(f"nohup {bashScript} '{filePath}' 2>&1 > {bashScript}.log")
+        os.system(f"nohup {bashScript} '{filePath}' > {bashScript}.log 2>&1 &")
         
     def tokenAt(self, position):
         for token in self.tokens:
             if token.offset < position and (token.offset + len(token.code)) >= position:
                 return token
         return None
-        
-    def _afterTextChanged(self):
-        self.setMinimumWidth(0)
-        self.setMinimumHeight(0)
-        self.setMaximumWidth(16777215)
-        self.setMaximumHeight(16777215)
         
     def _toggleFileSearch(self):
         print("*_toggleFileSearch*")

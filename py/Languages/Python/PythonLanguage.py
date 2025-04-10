@@ -37,7 +37,8 @@ class PythonLanguage(Language):
             #RegexMatcher(r'\s+', "T_WHITESPACE"),
             RegexMatcher(r'\s+', "T_WHITESPACE"),
             DirectTokenMatcher("@", "T_DECORATOR"),
-            RegexMatcher(r'[a-zA-Z0-9_]+', "T_SYMBOL"),
+            RegexMatcher(r'[a-zA-Z_][a-zA-Z0-9_]+', "T_SYMBOL"),
+            RegexMatcher(r'[0-9_]+(\.[0-9]*)?', "T_NUMBER"),
             RegexMatcher(r'\#([^\n]*)', "T_COMMENT"),
             DirectTokenMatcher([
                 ".", ",", "(", ")", "[", "]", "{", "}", ":", "="
@@ -123,7 +124,8 @@ class PythonLanguage(Language):
             identifier,
             call,
             TokenNodePattern("T_LITERAL"),
-            operation
+            TokenNodePattern("T_NUMBER"),
+            # operation # Infinite loop? expr => operation => expression => ... HOW?!
         ]))
         
         return [
@@ -191,11 +193,11 @@ class PythonLanguage(Language):
                     format.setFontWeight(QFont.Bold)
 
             if node.tokenName == "T_SYMBOL":
-                format.setForeground(Qt.black)
+                #format.setForeground(Qt.black)
                 if node.code in ["self", "super"]:
                     format.setFontWeight(QFont.Bold)
                 
-            if node.tokenName == "T_LITERAL":
+            if node.tokenName in ["T_LITERAL", "T_NUMBER"]:
                 format.setForeground(Qt.magenta)
                 
             if node.tokenName == "T_COMMENT":
@@ -205,5 +207,11 @@ class PythonLanguage(Language):
                 
             # white, black, red, darkRed, green, darkGreen, blue, darkBlue, cyan, darkCyan, magenta, 
             # darkMagenta, yellow, darkYellow, gray, darkGray, lightGray, transparent, color0, color1
+                
+        elif node.type == "identifier":
+            if node.parent != None and node.parent.type == "call":
+                format = QTextCharFormat()
+                format.setForeground(Qt.blue)
+                return format
                 
         return None

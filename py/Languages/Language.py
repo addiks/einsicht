@@ -37,11 +37,27 @@ class Language: # abstract
 
     def isNodeRelevantForGrammar(self, node): # boolean
         raise NotImplementedError
+        
+    def findClasses(self, root): # returns list[ClassDef]
+        return []
+        
+    def findMethods(self, root, classDef): # returns list[MethodDef]
+        return []
+        
+    def findFunctions(self, root): # returns list[FunctionDef]
+        return []
+        
+    def findCalls(self, root): # returns list[CallDef]
+        return []
 
     def parse(self, code, previousAST, previousTokens): # return: [ASTNode, list(TokenNode)]
         hash = hashlib.md5(code.encode()).hexdigest()
         if hash not in self._parseCache:
             tokens = self.lex(code, previousTokens)
+            
+            if len(tokens) <= 0:
+                self._parseCache[hash] = (None, tokens)
+                return self._parseCache[hash]
 
             tokens = self.normalize(tokens)
             
@@ -61,7 +77,7 @@ class Language: # abstract
             
             nodes = tokens.copy()
             
-            dumpAST(nodes)
+            #dumpAST(nodes)
             
             grammarMap = self.grammarMap()
             while len(nodeMap) > 0:
@@ -90,6 +106,7 @@ class Language: # abstract
             
                                     for replacedNode in replacedNodes:
                                         hasMutated = True
+                                        #print(["a", replacedNode.type])
                                         
                                         replacedNodeKey = replacedNode.grammarKey()
                                         nodeMap[replacedNodeKey].remove(replacedNode)
@@ -104,6 +121,7 @@ class Language: # abstract
                                     if newNodeIndex != None:
                                         hasMutated = True
                                         newNode = nodes[newNodeIndex]
+                                        #print(["b", newNodeIndex, newNode.type])
                                         newNodeKey = newNode.grammarKey()
                                         if newNodeKey not in nodeMap:
                                             nodeMap[newNodeKey] = []
@@ -254,15 +272,9 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
                     break
 
     def highlightAstNode(self, node, length):
-        if node.row == self._line:
-            format = self.language.formatForNode(node)
-            if format != None:
-                self.setFormat(
-                    node.col - 1,
-                    len(node.code), 
-                    format
-                )
-
+        if node == None:
+            return
+            
         for predecessor in node.prepended:
             self.highlightAstNode(predecessor, length)
 
@@ -273,9 +285,17 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
         for child in node.children:
             self.highlightAstNode(child, length)
 
+        if node.row == self._line:
+            format = self.language.formatForNode(node)
+            if format != None:
+                self.setFormat(
+                    node.col - 1,
+                    len(node.code), 
+                    format
+                )
 
 def dumpAST(nodes, level=0, depth=None):
-    if depth == None or level + 1 > depth:
+    if depth != None and level + 1 > depth:
         return
     for node in nodes:
         nodeDescr = "node: " + node.type

@@ -15,20 +15,29 @@ class MessageBroker(QtCore.QObject):
         
         filePath = editorWindow.filePath		
         
-        self.serviceName = "de.addiks.qtedit.file_" + hashlib.md5(filePath.encode('UTF-8')).hexdigest()
+        self.serviceName = "de.addiks.qtedit.file_" + hashlib.md5(
+            filePath.encode('UTF-8')
+        ).hexdigest()
         self.editorWindow = editorWindow
         
         self.sessionBus = QtDBus.QDBusConnection.sessionBus()
         
         if not self.sessionBus.isConnected():
-            raise Exception("Cannot connect to DBUS: " + self.sessionBus.lastError().message())
+            raise Exception(
+                "Cannot connect to DBUS: " + self.sessionBus.lastError().message()
+            )
          
         if not self.sessionBus.registerService(self.serviceName):
             interface = QtDBus.QDBusInterface(self.serviceName, '/file', '', self.sessionBus)
             interface.call('presentSelf')
             raise FileAlreadyOpenOnOtherProcessException()
         
-        self.sessionBus.registerObject('/file', 'local.py.qtedit.file', self, QtDBus.QDBusConnection.ExportAllSlots)
+        self.sessionBus.registerObject(
+            '/file', 
+            'local.py.qtedit.file', 
+            self, 
+            QtDBus.QDBusConnection.ExportAllSlots
+        )
         
     @Slot(str, result=str)
     def test(self, arg):

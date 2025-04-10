@@ -1,12 +1,13 @@
 
 class ASTNode:
-    def __init__(self, language, code, row, col, offset, type):
+    def __init__(self, language, code, row, col, offset, type, parent=None):
         self.language = language
         self.code = code
         self.row = row
         self.col = col
         self.offset = offset
         self.type = type
+        self.parent = parent
         self.children = []
         
         # Nodes in these two categories are part of the AST but have no semantic impact.
@@ -29,8 +30,17 @@ class ASTNode:
             code += successor.reconstructCode()
         return code
 
-    def find(self, selector):
-        pass
+    def find(self, selector): # list[ASTNode]
+        result = []
+        for child in children:
+            result += child.find(selector)
+        if callable(selector):
+            if selector(self):
+                result.append(self)
+        elif type(selector) == str:
+            if self.grammarKey() == str:
+                result.append(self)
+        return result
         
     def offsetIn(self, nodes):
         for index in range(0, len(nodes)):
@@ -42,17 +52,21 @@ class ASTNode:
         return self.type
 
 class ASTBranch(ASTNode):
-    def __init__(self, children, type):
+    def __init__(self, children, type, parent=None):
         firstChild = children[0]
         code = ""
         for child in children:
             code += child.reconstructCode()
+            child.parent = self
         super().__init__(
             firstChild.language,
             code,
             firstChild.row,
             firstChild.col,
             firstChild.offset,
-            type
+            type,
+            parent
         )
         self.children = children
+        self.parent = parent
+    

@@ -1,6 +1,6 @@
 
-
 from PySide6 import QtCore, QtWidgets, QtGui
+from PySide6.QtCore import QTimer
 
 class TextField(QtWidgets.QPlainTextEdit):
     
@@ -8,6 +8,7 @@ class TextField(QtWidgets.QPlainTextEdit):
         QtWidgets.QPlainTextEdit.__init__(self, parent)
         
         self.parent = parent
+        self._selectionChangeCounter = 0
         
         self.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
         
@@ -16,6 +17,7 @@ class TextField(QtWidgets.QPlainTextEdit):
         self.updateRequest.connect(self.onUpdateRequest)
         self.textChanged.connect(self.onTextChanged)
         self.selectionChanged.connect(self.onSelectionChanged)
+
         
         self.document().contentsChange.connect(self.onContentChange)
 
@@ -121,12 +123,23 @@ class TextField(QtWidgets.QPlainTextEdit):
         self.parent.onTextChanged()
 
     def onSelectionChanged(self):
+        self._selectionChangeCounter += 1
         cursor = self.textCursor()
         anchor = cursor.anchor()
         position = cursor.position()
         text = cursor.selectedText()
         
-        self.parent.onSelectionChanged(position, anchor, text)
+        currentTextChangeCounter = self._selectionChangeCounter
+        QTimer.singleShot(50, lambda: self._checkSelectionChanged(
+            currentTextChangeCounter, 
+            position, 
+            anchor, 
+            text
+        ))
+        
+    def _checkSelectionChanged(self, selectionChangeCounter, position, anchor, text):
+        if selectionChangeCounter == self._selectionChangeCounter:
+            self.parent.onSelectionChanged(position, anchor, text)
 
     def onContentChange(self, position, removed, added):
         # print([position, removed, added])

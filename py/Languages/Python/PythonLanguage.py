@@ -2,7 +2,7 @@
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QFont
 from PySide6.QtCore import QRegularExpression, Qt
 
-from ..Language import Language
+from ..Language import Language, ClassDef, MethodDef, FunctionDef
 
 from ..ASTPatterns import OptionalNode, NodeSequence, RepeatingNode
 from ..ASTPatterns import NodeBranch, LateDefinedASTPattern
@@ -53,7 +53,7 @@ class PythonLanguage(Language):
 
     def isNodeRelevantForGrammar(self, node): # boolean
         if isinstance(node, Token):
-            if node.tokenName in ["T_WHITESPACE", "T_COMMENT"]:
+            if node.tokenName in ["T_WHITESPACE", "T_COMMENT", "T_INDENTATION"]:
                 return False
         return True
 
@@ -102,6 +102,12 @@ class PythonLanguage(Language):
             tuple
         ])
         
+        raiseDef = NodeSequence("raise", [
+            TokenNodePattern("T_RAISE"),
+            identifier,
+            tuple
+        ])
+        
         decorator = NodeSequence("decorator", [
             TokenNodePattern("@"),
             identifier,
@@ -120,6 +126,20 @@ class PythonLanguage(Language):
             expression
         ])
         
+        classDefinition = NodeSequence("class", [
+            TokenNodePattern("T_CLASS"),
+            identifier,
+            tuple,
+            TokenNodePattern(":"),
+        ])
+        
+        functionDefinition = NodeSequence("function", [
+            TokenNodePattern("T_DEF"),
+            identifier,
+            tuple,
+            TokenNodePattern(":"),
+        ])
+        
         expression.definePattern(NodeBranch("expression", [
             identifier,
             call,
@@ -133,6 +153,9 @@ class PythonLanguage(Language):
             importFrom,
             identifier,
             tuple,
+            classDefinition,
+            functionDefinition,
+            raiseDef,
             call,
             decorator,
             operation,
@@ -189,8 +212,6 @@ class PythonLanguage(Language):
 
             if node.tokenName in ["T_FROM", "T_IMPORT"]:
                 format.setForeground(Qt.darkYellow)
-                if node.tokenName == "T_IMPORT":
-                    format.setFontWeight(QFont.Bold)
 
             if node.tokenName == "T_SYMBOL":
                 #format.setForeground(Qt.black)
@@ -209,9 +230,50 @@ class PythonLanguage(Language):
             # darkMagenta, yellow, darkYellow, gray, darkGray, lightGray, transparent, color0, color1
                 
         elif node.type == "identifier":
+            if node.parent != None and node.parent.type == "raise":
+                format = QTextCharFormat()
+                format.setForeground(Qt.red)
+                return format
+                
             if node.parent != None and node.parent.type == "call":
                 format = QTextCharFormat()
                 format.setForeground(Qt.blue)
                 return format
                 
+            if node.parent != None and node.parent.type in ["function", "class"]:
+                format = QTextCharFormat()
+                format.setForeground(Qt.darkYellow)
+                format.setFontWeight(QFont.Bold)
+                return format
+                
         return None
+
+    def populateFileContext(self, context):
+    
+        filePath = context.filePath[len(context.projectFolder)+1:]
+        
+        # TODO: This assumes that the project-root is also the python-path root
+        pythonPath = filePath.replace(".py", "").replace("/", ".")
+        
+        # print(filePath, pythonPath)
+    
+        for classNode in context.syntaxTree.find("class"):
+            classBlock = classNode.next()
+            classDef = ClassDef(
+                classNode.find("identifier")[0].code, 
+                namespace = pythonPath,
+                parents=list(map(lambda a: a.code, classNode.find("tuple-element"))),
+                node=classNode,
+                block=classBlock
+            )
+            context.addClass(classDef)
+            
+            for methodNode in classBlock.find("function"):
+                print(methodNode)
+                MethodDef(
+                    classDef
+                )
+                
+        for functionNode in context.syntaxTree.find("function"):
+            pass
+        

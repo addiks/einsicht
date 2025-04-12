@@ -38,18 +38,9 @@ class Language: # abstract
     def isNodeRelevantForGrammar(self, node): # boolean
         raise NotImplementedError
         
-    def findClasses(self, root): # returns list[ClassDef]
+    def populateFileContext(self, context):
         return []
         
-    def findMethods(self, root, classDef): # returns list[MethodDef]
-        return []
-        
-    def findFunctions(self, root): # returns list[FunctionDef]
-        return []
-        
-    def findCalls(self, root): # returns list[CallDef]
-        return []
-
     def parse(self, code, previousAST, previousTokens): # return: [ASTNode, list(TokenNode)]
         hash = hashlib.md5(code.encode()).hexdigest()
         if hash not in self._parseCache:
@@ -235,6 +226,69 @@ class Language: # abstract
                         self._grammarMap[key] = []
                     self._grammarMap[key].append(pattern)
         return self._grammarMap
+        
+class ClassDef:
+    def __init__(self, identifier, namespace=None, parents=[], flags=[], block=None, node=None):
+        self.identifier = identifier # string
+        self.namespace = namespace # string
+        self.parents = parents # list[string]
+        self.flags = flags # list[string]
+        self.block = block # ASTNode: represents the class code-block
+        self.node = node # ASTNode: represents the class definition node
+        self._methods = []
+        
+    def addMethod(self, methodDef):
+        assert isinstance(methodDef, MethodDef)
+        self._methods.append(methodDef)
+        
+    def methods(self):
+        return self._methods
+        
+class MethodDef:
+    def __init__(self, classDef):
+        self._classDef = classDef
+        classDef.addMethod(self)
+        
+class FunctionDef:
+    def __init__(self):
+        pass
+        
+class UseDef:
+    def __init__(self):
+        pass
+        
+class FileContext:
+
+    def __init__(self, filePath, projectFolder, syntaxTree, language):
+        self.filePath = filePath
+        self.projectFolder = projectFolder
+        self.syntaxTree = syntaxTree
+        self._classes = []
+        self._functions = []
+        self._uses = []
+        self.language = language
+        
+    def addClass(self, classDef):
+        assert isinstance(classDef, ClassDef)
+        self._classes.append(classDef)
+        
+    def addFunction(self, functionDef):
+        assert isinstance(functionDef, FunctionDef)
+        self._functions.append(functionDef)
+        
+    def addUse(self, useDef):
+        assert isinstance(useDef, UseDef)
+        self._uses.append(useDef)
+        
+    def classes(self):
+        return self._classes
+        
+    def functions(self):
+        return self._functions
+        
+    def uses(self):
+        return self._uses
+        
         
 class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
     

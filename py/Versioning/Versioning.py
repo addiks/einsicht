@@ -7,6 +7,9 @@ class Versioning:
     def projectRoot(self):
         raise NotImplementedError
     
+    def metaFolder(self):
+        raise NotImplementedError
+    
     def status(self):
         raise NotImplementedError
         

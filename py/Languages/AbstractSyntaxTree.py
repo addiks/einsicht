@@ -29,18 +29,28 @@ class ASTNode:
         for successor in self.appended:
             code += successor.reconstructCode()
         return code
+        
+    def matches(self, selector): # bool
+        if callable(selector):
+            return selector(self)
+        elif type(selector) == str:
+            return self.grammarKey() == selector
 
     def find(self, selector): # list[ASTNode]
         result = []
-        for child in children:
+        for child in self.children:
             result += child.find(selector)
-        if callable(selector):
-            if selector(self):
-                result.append(self)
-        elif type(selector) == str:
-            if self.grammarKey() == str:
-                result.append(self)
+        if self.matches(selector):
+            result.append(self)
         return result
+        
+    def hasParentWith(self, selector): # bool
+        if self.parent != None:
+            if self.parent.matches(selector):
+                return True
+            if self.parent.hasParentWith(selector):
+                return True
+        return False
         
     def offsetIn(self, nodes):
         for index in range(0, len(nodes)):
@@ -50,14 +60,34 @@ class ASTNode:
         
     def grammarKey(self):
         return self.type
+        
+    def next(self):
+        if self.parent != None:
+            return self.parent.nextChild(self)
+        return None
+            
+    def previous(self):
+        if self.parent != None:
+            return self.parent.previousChild(self)
+        return None
+            
+    def nextChild(self, previous):
+        return None
+        
+    def previousChild(self, next):
+        return None
 
 class ASTBranch(ASTNode):
     def __init__(self, children, type, parent=None):
         firstChild = children[0]
+        self._childToIndex = {}
         code = ""
+        index = 0
         for child in children:
             code += child.reconstructCode()
             child.parent = self
+            self._childToIndex[child] = index
+            index += 1
         super().__init__(
             firstChild.language,
             code,
@@ -70,3 +100,16 @@ class ASTBranch(ASTNode):
         self.children = children
         self.parent = parent
     
+    def nextChild(self, previous):
+        index = self._childToIndex[previous] + 1
+        if index < len(self.children):
+            return self.children[index]
+        else:
+            return None
+        
+    def previousChild(self, next):
+        index = self._childToIndex[next] - 1
+        if index >= 0:
+            return self.children[index]
+        else:
+            return None

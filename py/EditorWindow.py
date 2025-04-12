@@ -14,7 +14,9 @@ from py.Widgets.LineNumbers import LineNumbers
 from py.MessageBroker import MessageBroker
 from py.Languages.LanguageSelector import LanguageSelector
 from py.Languages.Language import Language, LanguageFromSyntaxTreeHighlighter
+from py.Languages.Language import FileContext
 from py.Versioning.VersioningSelector import VersioningSelector
+from py.ProjectIndex import ProjectIndex
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
@@ -52,6 +54,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.hashOnDisk = ""
         self.lengthOnDisk = 0
         self.versioning = None
+        self.projectIndex = None
         self.tokens = None
         self.syntaxTree = None
         
@@ -74,6 +77,10 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         self.versioning = self._versioningSelector.selectVersioningFor(self.filePath)
         
+        self.projectIndex = None
+        if self.versioning != None:
+            self.projectIndex = ProjectIndex(self.versioning.metaFolder() + "/adedit.db")
+        
         self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
         self.lengthOnDisk = len(self.fileContent)
         
@@ -87,6 +94,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
         self.lengthOnDisk = len(self.fileContent)
         self.updateTitle()
+        self._updateProjectIndex()
 
     def updateTitle(self):
         textHash = hashlib.md5(self.fileContent.encode()).hexdigest()
@@ -144,15 +152,31 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
                 self.highlighter.updateSyntaxTree(self.syntaxTree)
             
-            if self.tokens != None:
-                cursorPos = self.textField.textCursor().position()
-                token = self.tokenAt(cursorPos)
-                if token != None:
-                    tokenPos = cursorPos - token.offset
-                    prefix = token.code[:tokenPos]
-                    postfix = token.code[tokenPos:]
-                    print([prefix, postfix])
+            self._checkAutocompleteTrigger()
+                    
+    def _updateProjectIndex(self):
+        if self.syntaxTree != None and self.projectIndex != None:
+            context = FileContext(
+                self.filePath, 
+                self.versioning.projectRoot(), 
+                self.syntaxTree,
+                self.language
+            )
+            
+            self.language.populateFileContext(context)
+            self.projectIndex.storeFileContext(context)
+            
+    def _checkAutocompleteTrigger(self):
+        if self.tokens != None and self.projectIndex != None:
+            cursorPos = self.textField.textCursor().position()
+            token = self.tokenAt(cursorPos)
+            if token != None:
+                tokenPos = cursorPos - token.offset
+                prefix = token.code[:tokenPos]
+                postfix = token.code[tokenPos:]
                 
+                results = self.projectIndex.search(prefix, postfix)
+                print(results)
         
     def _updateDimensions(self):
         contentWidth = self.textField.contentWidth()

@@ -9,8 +9,9 @@ class VersioningSelector:
         directoryPath = path.dirname(filePath)
         while path.isdir(directoryPath) and directoryPath != "/":
             directoryPath = path.dirname(directoryPath)
-            if path.isdir(directoryPath + "/.git"):
-                return GitVersioning(directoryPath)
+            metaFolder = directoryPath + "/.git"
+            if path.isdir(metaFolder):
+                return GitVersioning(directoryPath, metaFolder)
         return None
         
 

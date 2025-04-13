@@ -26,7 +26,7 @@ class PythonLanguage(Language):
                 "def", "pass", "class", "lambda",
                 "if", "elif", "else", "not",
                 "return", "break", "continue", 
-                "raise", "except", "try",
+                "raise", "except", "try", "finally",
                 "while", "for",
                 "True", "False", "None",
                 "and", "or", "xor", "not",
@@ -270,10 +270,23 @@ class PythonLanguage(Language):
             
             for methodNode in classBlock.find("function"):
                 print(methodNode)
+                
+                methodArguments = []
+                for element in methodNode.find("tuple-element"):
+                    methodArguments.append(element.code)
+                
                 MethodDef(
-                    classDef
+                    classDef,
+                    methodNode.children[1].code,
+                    methodArguments
                 )
                 
         for functionNode in context.syntaxTree.find("function"):
-            pass
+            functionArguments = []
+            for element in functionNode.find("tuple-element"):
+                functionArguments.append(element.code)
+            context.addFunction(FunctionDef(
+                functionNode.children[1].code,
+                functionArguments
+            ))
         

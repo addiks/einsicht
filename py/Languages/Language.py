@@ -79,6 +79,9 @@ class Language: # abstract
                     if nodeKey in grammarMap:
                     
                         #print(" Processing nodes of " + nodeKey)
+                        
+                        if nodeKey not in nodeMap:
+                            continue
                     
                         for node in nodeMap[nodeKey].copy():
                             for pattern in grammarMap[nodeKey]:
@@ -245,17 +248,21 @@ class ClassDef:
         return self._methods
         
 class MethodDef:
-    def __init__(self, classDef):
+    def __init__(self, classDef, identifier, arguments=[]):
         self._classDef = classDef
+        self.identifier = identifier
         classDef.addMethod(self)
         
 class FunctionDef:
-    def __init__(self):
-        pass
+    def __init__(self, identifier, arguments=[]):
+        self.identifier = identifier
+        self.arguments = arguments
         
 class UseDef:
-    def __init__(self):
-        pass
+    def __init__(self, identifier, type):
+        assert type in ["class", "method", "function"]
+        self.identifier = identifier
+        self.type = type
         
 class FileContext:
 

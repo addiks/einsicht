@@ -346,6 +346,7 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
         for child in node.children:
             self.highlightAstNode(child, length)
 
+        # TODO: This does not work for multiline highlights
         if node.row == self._line:
             format = self.language.formatForNode(node)
             if format != None:

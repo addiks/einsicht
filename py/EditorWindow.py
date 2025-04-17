@@ -53,6 +53,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.setWindowTitle("[No file] - adEdit")
         self.hashOnDisk = ""
         self.lengthOnDisk = 0
+        self.language = None
         self.versioning = None
         self.projectIndex = None
         self.tokens = None
@@ -100,7 +101,9 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         textHash = hashlib.md5(self.fileContent.encode()).hexdigest()
         modified = (len(self.fileContent) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
 
-        if modified:
+        if self.filePath == None:
+            self.setWindowTitle("[No file] - adEdit")
+        elif modified:
             self.setWindowTitle("* %s (%s) - adEdit" % (
                 basename(self.filePath), 
                 dirname(self.filePath)
@@ -230,8 +233,11 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         )
         
         bashScript = "/home/gerrit/workspace/Privat/adEdit/bin/adedit.sh"
-        
         os.system(f"nohup {bashScript} '{filePath}' > {bashScript}.log 2>&1 &")
+        
+    def newFile(self):
+        bashScript = "/home/gerrit/workspace/Privat/adEdit/bin/adedit.sh"
+        os.system(f"nohup {bashScript} > {bashScript}.log 2>&1 &")
         
     def tokenAt(self, position):
         for token in self.tokens:
@@ -249,6 +255,11 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         ########
         ### FILE
         fileMenu = menuBar.addMenu('File')
+        
+        newAction = fileMenu.addAction('New')
+        newAction.setShortcut('Ctrl+N')
+        newAction.setStatusTip('New')
+        newAction.triggered.connect(self.newFile)
         
         openAction = fileMenu.addAction('Open')
         openAction.setShortcut('Ctrl+O')

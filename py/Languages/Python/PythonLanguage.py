@@ -199,7 +199,7 @@ class PythonLanguage(Language):
                 "T_IF", "T_ELSE", "T_ELIF", 
                 "T_PASS", "T_RAISE", "T_RETURN", 
                 "T_BREAK", "T_CONTINUE",
-                "T_ASSERT",
+                "T_ASSERT", "T_DEL",
                 "T_WHILE", "T_FOR",
                 "T_TRY", "T_CATCH", "T_EXCEPT",
                 "T_AND", "T_OR", "T_XOR", "T_NOT"
@@ -269,7 +269,7 @@ class PythonLanguage(Language):
             context.addClass(classDef)
             
             for methodNode in classBlock.find("function"):
-                print(methodNode)
+                print(["method", methodNode])
                 
                 methodArguments = []
                 for element in methodNode.find("tuple-element"):
@@ -278,7 +278,8 @@ class PythonLanguage(Language):
                 MethodDef(
                     classDef,
                     methodNode.children[1].code,
-                    methodArguments
+                    arguments=methodArguments,
+                    node=methodNode
                 )
                 
         for functionNode in context.syntaxTree.find("function"):

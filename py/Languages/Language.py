@@ -242,15 +242,19 @@ class ClassDef:
         
     def addMethod(self, methodDef):
         assert isinstance(methodDef, MethodDef)
+        print(["addMethod", methodDef])
         self._methods.append(methodDef)
         
     def methods(self):
         return self._methods
         
 class MethodDef:
-    def __init__(self, classDef, identifier, arguments=[]):
+    def __init__(self, classDef, identifier, arguments=[], node=None):
         self._classDef = classDef
         self.identifier = identifier
+        self.flags = []
+        self.returntype = ""
+        self.node = node
         classDef.addMethod(self)
         
 class FunctionDef:

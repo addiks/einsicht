@@ -7,6 +7,7 @@ class ProjectIndex:
         self._dbFilePath = dbFilePath
         self._dbConnection = None
         self._lock = Lock()
+        self._inQuery = False
         
     def storeFileContext(self, context):
         print("*storeFileContext*")
@@ -40,26 +41,26 @@ class ProjectIndex:
         return []
         
     def _storeClassDef(self, classDef, context):
-        for methodDef in classDef.methods():
-            print([methodDef])
-        
         classRows = self._query(
-            "SELECT * FROM classes WHERE filepath = :file AND name = :class",
+            "SELECT id FROM classes WHERE filepath = :file AND name = :class",
             params={"file": context.filePath, "class": classDef.identifier}
         )
         
+        classId = None
+        
         if len(classRows) > 0:
             for classRow in classRows:
-                pass
+                classId = classRow[0]
             
         else:
+            classId = uuid.uuid4().hex
             self._query("""
                 INSERT INTO classes 
                 (id, name, namespace, flags, filepath, language, line, column) 
                 VALUES 
                 (:id, :name, :ns, :flags, :path, :lang, :line, :column)
             """, params={
-                "id": uuid.uuid4().hex,
+                "id": classId,
                 "name": classDef.identifier,
                 "ns": classDef.namespace,
                 "flags": ",".join(classDef.flags),
@@ -67,6 +68,38 @@ class ProjectIndex:
                 "lang": context.language.name(),
                 "line": classDef.node.row,
                 "column": classDef.node.col
+            })
+            
+        for methodDef in classDef.methods():
+            self._storeMethodDef(methodDef, classId, context)
+            
+    def _storeMethodDef(self, methodDef, classId, context):
+        methodRows = self._query(
+            "SELECT * FROM classes_methods WHERE class_id = :class AND name = :method",
+            params={"method": methodDef.identifier, "class": classId}
+        )
+        
+        methodId = None
+        
+        if len(methodRows) > 0:
+            for methodRow in methodRows:
+                methodId = methodRow["id"]
+                
+        else:
+            methodId = uuid.uuid4().hex
+            self._query("""
+                INSERT INTO classes_methods 
+                (id, class_id, name, returntype, flags, line, column) 
+                VALUES 
+                (:id, :class_id, :name, :returntype, :flags, :line, :column)
+            """, params={
+                "id": methodId,
+                "class_id": classId,
+                "name": methodDef.identifier,
+                "returntype": methodDef.returntype,
+                "flags": ",".join(methodDef.flags),
+                "line": methodDef.node.row,
+                "column": methodDef.node.col
             })
             
     def _classExists(self, identifier, filePath):
@@ -116,7 +149,6 @@ class ProjectIndex:
             {"name": "returntype", "type": "VARCHAR(512)"},
             {"name": "flags", "type": "VARCHAR(512)"},
             {"name": "arguments", "type": "TEXT"},
-            {"name": "filepath", "type": "VARCHAR(512)", "notnull": 1},
             {"name": "line", "type": "INTEGER"},
             {"name": "column", "type": "SMALLINT"}
         ])
@@ -161,8 +193,13 @@ class ProjectIndex:
                     )
                     schemaModified = True
                     
-                elif column["type"] != existingColumns[column["name"]][2]:
-                    pass # TODO: modifying columns is not supported in sqlite!
+                else:
+                    if column["type"] != existingColumns[column["name"]][2]:
+                        pass # TODO: modifying columns is not supported in sqlite!
+                    del existingColumns[column["name"]]
+                    
+            for columnName in existingColumns.keys():
+                self._query(f"ALTER TABLE {tableName} DROP COLUMN {columnName}")
             
         else:
             columnDef = ""
@@ -192,13 +229,16 @@ class ProjectIndex:
         return False
         
     def _query(self, sql, params={}, lock=True):
+        self._inQuery = True
         connection = self._connection()
+        self._inQuery = True
         try:
             if lock:
                 self._lock.acquire()
-            print([sql, params])
+            #print([sql, params])
             cursor = connection.execute(sql, params)
             return cursor.fetchall()
         finally:
+            self._inQuery = False
             if lock:
                 self._lock.release()

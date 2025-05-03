@@ -2,7 +2,7 @@
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QFont
 from PySide6.QtCore import QRegularExpression, Qt
 
-from ..Language import Language, ClassDef, MethodDef, FunctionDef
+from ..Language import Language, ClassDef, MethodDef, MemberDef, FunctionDef, dumpAST
 
 from ..ASTPatterns import OptionalNode, NodeSequence, RepeatingNode
 from ..ASTPatterns import NodeBranch, LateDefinedASTPattern
@@ -32,9 +32,8 @@ class PythonLanguage(Language):
                 "and", "or", "xor", "not",
                 "del", "as", "in", "breakpoint"
             ], self),
-            #RegexMatcher(r'\n+', "T_WHITESPACE"),
+            RegexMatcher(r'\n( +)?(?=\n)', "T_INDENTATION_SUPERFLUOUS"),
             RegexMatcher(r'\n( +)?', "T_INDENTATION"),
-            #RegexMatcher(r'\s+', "T_WHITESPACE"),
             RegexMatcher(r'\s+', "T_WHITESPACE"),
             DirectTokenMatcher("@", "T_DECORATOR"),
             RegexMatcher(r'[a-zA-Z_][a-zA-Z0-9_]+', "T_SYMBOL"),
@@ -43,10 +42,8 @@ class PythonLanguage(Language):
             DirectTokenMatcher([
                 ".", ",", "(", ")", "[", "]", "{", "}", ":", "="
             ], "T_SPECIAL_CHAR"),
-            DirectTokenMatcher(
-                ["+", "-", "*", "/"], 
-                "T_OPERATOR"
-            ),
+            DirectTokenMatcher(["=", "+=", "-=", "*=", "/="], "T_ASSIGN"),
+            DirectTokenMatcher(["+", "-", "*", "/"], "T_OPERATOR"),
             LiteralTokenMatcher("'", "T_LITERAL"),
             LiteralTokenMatcher('"', "T_LITERAL")
         ]
@@ -59,14 +56,7 @@ class PythonLanguage(Language):
 
     def grammar(self):
         
-        #return [NodeSequence("test", [
-        #    TokenNodePattern("T_FROM"),
-        #    TokenNodePattern("T_SYMBOL")
-        #])]
-        
-        # return [RepeatingNode("test", TokenNodePattern("T_INDENTATION"), False)]
-        
-        expression = LateDefinedASTPattern()
+        expression = LateDefinedASTPattern("expression")
 
         identifier = NodeSequence("identifier", [
             TokenNodePattern("T_SYMBOL"),
@@ -95,6 +85,15 @@ class PythonLanguage(Language):
                 OptionalNode(TokenNodePattern(","))
             ]), True),
             TokenNodePattern(")")
+        ])
+        
+        list = NodeSequence("list", [
+            TokenNodePattern("["),
+            RepeatingNode("list-content", NodeSequence("list-element", [
+                expression,
+                OptionalNode(TokenNodePattern(","))
+            ]), True),
+            TokenNodePattern("]")
         ])
         
         call = NodeSequence("call", [
@@ -140,12 +139,29 @@ class PythonLanguage(Language):
             TokenNodePattern(":"),
         ])
         
-        expression.definePattern(NodeBranch("expression", [
+        boolean = NodeBranch("boolean", [
+            TokenNodePattern("T_TRUE"),
+            TokenNodePattern("T_FALSE"),
+        ])
+        
+        expressionElement = NodeBranch("expression-element", [
             identifier,
             call,
+            boolean,
+            list,
+            tuple,
             TokenNodePattern("T_LITERAL"),
             TokenNodePattern("T_NUMBER"),
             # operation # Infinite loop? expr => operation => expression => ... HOW?!
+        ])
+        
+        expressionSuffix = NodeBranch("expression-suffix", [
+            list,
+        ])
+        
+        expression.definePattern(NodeSequence("expression", [
+            expressionElement,
+            RepeatingNode("expression-suffixes", expressionSuffix, True),
         ]))
         
         return [
@@ -153,6 +169,8 @@ class PythonLanguage(Language):
             importFrom,
             identifier,
             tuple,
+            list,
+            boolean,
             classDefinition,
             functionDefinition,
             raiseDef,
@@ -160,7 +178,8 @@ class PythonLanguage(Language):
             decorator,
             operation,
             assignment,
-            expression
+            expression,
+            expressionElement
         ]
 
     def groupStatementsIntoBlocks(self, nodes): # list<ASTNode>
@@ -169,11 +188,16 @@ class PythonLanguage(Language):
         stack = [CodeBlock(self, 1, 1, 0)]
         depthStack = [0]
         for node in nodes:
-            if isinstance(node, Token) and node.tokenName == "T_INDENTATION":
-                currentIndentation = node.code.count(" ")
+            for indentationNode in node.findInPrepended("T_INDENTATION"):
+                currentIndentation = indentationNode.code.count(" ")
                 if currentIndentation > level:
                     level = currentIndentation
-                    stack.append(CodeBlock(self, node.row, node.col, node.offset))
+                    stack.append(CodeBlock(
+                        self, 
+                        indentationNode.row, 
+                        indentationNode.col, 
+                        indentationNode.offset
+                    ))
                     depthStack.append(level)
                 elif currentIndentation < level:
                     while currentIndentation < level:
@@ -197,11 +221,11 @@ class PythonLanguage(Language):
 
             if node.tokenName in [
                 "T_IF", "T_ELSE", "T_ELIF", 
-                "T_PASS", "T_RAISE", "T_RETURN", 
+                "T_PASS", "T_RAISE", "T_RETURN", "T_LAMBDA",
                 "T_BREAK", "T_CONTINUE",
-                "T_ASSERT", "T_DEL",
+                "T_ASSERT", "T_DEL", "T_AS",
                 "T_WHILE", "T_FOR",
-                "T_TRY", "T_CATCH", "T_EXCEPT",
+                "T_TRY", "T_CATCH", "T_EXCEPT", "T_FINALLY",
                 "T_AND", "T_OR", "T_XOR", "T_NOT"
             ]:
                 format.setFontWeight(QFont.Bold)
@@ -249,13 +273,13 @@ class PythonLanguage(Language):
         return None
 
     def populateFileContext(self, context):
-    
         filePath = context.filePath[len(context.projectFolder)+1:]
         
         # TODO: This assumes that the project-root is also the python-path root
         pythonPath = filePath.replace(".py", "").replace("/", ".")
         
         # print(filePath, pythonPath)
+        # dumpAST([context.syntaxTree], depth=13)
     
         for classNode in context.syntaxTree.find("class"):
             classBlock = classNode.next()
@@ -269,8 +293,6 @@ class PythonLanguage(Language):
             context.addClass(classDef)
             
             for methodNode in classBlock.find("function"):
-                print(["method", methodNode])
-                
                 methodArguments = []
                 for element in methodNode.find("tuple-element"):
                     methodArguments.append(element.code)
@@ -281,6 +303,17 @@ class PythonLanguage(Language):
                     arguments=methodArguments,
                     node=methodNode
                 )
+                
+            for assignmentNode in classBlock.find("assignment"):
+                key = assignmentNode.children[0].code.strip()
+                if key[0:5] == "self.":
+                    propertyName = key[5:]
+                    
+                    MemberDef(
+                        classDef,
+                        propertyName,
+                        assignmentNode
+                    )
                 
         for functionNode in context.syntaxTree.find("function"):
             functionArguments = []

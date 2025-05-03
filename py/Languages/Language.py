@@ -41,10 +41,11 @@ class Language: # abstract
     def populateFileContext(self, context):
         return []
         
-    def parse(self, code, previousAST, previousTokens): # return: [ASTNode, list(TokenNode)]
+    def parse(self, code, previousAST=None, previousTokens=None): # return: [ASTNode, list(TokenNode)]
         hash = hashlib.md5(code.encode()).hexdigest()
         if hash not in self._parseCache:
             tokens = self.lex(code, previousTokens)
+            #dumpAST(tokens)
             
             if len(tokens) <= 0:
                 self._parseCache[hash] = (None, tokens)
@@ -73,12 +74,8 @@ class Language: # abstract
             grammarMap = self.grammarMap()
             while len(nodeMap) > 0:
                 hasMutated = False
-                #print("###")
                 for nodeKey in nodeMap.copy().keys():
-                    #print(["#", len(nodeMap), nodeKey])
                     if nodeKey in grammarMap:
-                    
-                        #print(" Processing nodes of " + nodeKey)
                         
                         if nodeKey not in nodeMap:
                             continue
@@ -89,18 +86,12 @@ class Language: # abstract
                                 nodeIndex = node.offsetIn(nodes)
                                 if nodeIndex == None:
                                     break
-                                    
-                                #print(" Trying to match pattern " + pattern.producedNodeKey() + " at node " + str(node))
                                 
                                 if pattern.matches(nodes, nodeIndex):
-                                    #print("MATCH!")
                                     (replacedNodes, newNodeIndex) = pattern.mutate(nodes, nodeIndex)
-                                    
-                                    #dumpAST(nodes)
             
                                     for replacedNode in replacedNodes:
                                         hasMutated = True
-                                        #print(["a", replacedNode.type])
                                         
                                         replacedNodeKey = replacedNode.grammarKey()
                                         nodeMap[replacedNodeKey].remove(replacedNode)
@@ -115,7 +106,6 @@ class Language: # abstract
                                     if newNodeIndex != None:
                                         hasMutated = True
                                         newNode = nodes[newNodeIndex]
-                                        #print(["b", newNodeIndex, newNode.type])
                                         newNodeKey = newNode.grammarKey()
                                         if newNodeKey not in nodeMap:
                                             nodeMap[newNodeKey] = []
@@ -125,34 +115,44 @@ class Language: # abstract
             
                 if not hasMutated:
                     break
-                    
-            dumpAST(nodes, depth=1)
             
             nodes = self.groupStatementsIntoBlocks(nodes)
+            
+            #dumpAST(nodes, depth=1)
             
             self._parseCache[hash] = (ASTBranch(nodes, "root"), tokens)
         return self._parseCache[hash]
         
-    def normalize(self, tokens):
+    def normalize(self, nodes):
         index = 0
-        while index < len(tokens):
-            predecessor = None
-            if index > 0:
-                predecessor = tokens[index - 1]
-            successor = None
-            if index < len(tokens) - 1:
-                successor = tokens[index + 1]
-            if not self.isNodeRelevantForGrammar(tokens[index]):
-                if index > 0:
-                    tokens[index - 1].append(tokens[index])
-                    tokens = tokens[:index] + tokens[index+1:]
+        lastRelevantIndex = None # int
+        irrelevantIndexes = [] # list<int>
+        while index < len(nodes):
+            node = nodes[index]
+            if self.isNodeRelevantForGrammar(node):
+                indexShift = 0
+                while len(irrelevantIndexes) > 0:
+                    irrelevantIndex = irrelevantIndexes.pop(0)
+                    irrelevantNode = nodes.pop(irrelevantIndex + indexShift)
                     index -= 1
-                elif index < len(tokens) - 1:
-                    tokens[index + 1].prepend(tokens[index])
-                    tokens = tokens[:index] + tokens[index+1:]
-                    index -= 1
+                    indexShift -= 1
+                    node.prepend(irrelevantNode)
+                lastRelevantIndex = index
+            else:
+                irrelevantIndexes.append(index)
+        
             index += 1
-        return tokens
+        
+        if lastRelevantIndex != None and len(irrelevantIndexes) > 0:
+            node = nodes[lastRelevantIndex]
+            indexShift = 0
+            while len(irrelevantIndexes) > 0:
+                irrelevantIndex = irrelevantIndexes.pop(0)
+                irrelevantNode = nodes.pop(irrelevantIndex + indexShift)
+                indexShift -= 1
+                node.append(irrelevantNode)
+        
+        return nodes
 
     def lex(self, code, previousTokens):
         # TODO: re-use data from previousTokens for better performance
@@ -222,9 +222,7 @@ class Language: # abstract
             self._grammarMap = {}
             for pattern in patterns:
                 assert isinstance(pattern, NodePattern)
-                #print([pattern, pattern.nodeKeys()])
                 for key in pattern.nodeKeys():
-                    #print(key)
                     if not key in self._grammarMap:
                         self._grammarMap[key] = []
                     self._grammarMap[key].append(pattern)
@@ -239,14 +237,21 @@ class ClassDef:
         self.block = block # ASTNode: represents the class code-block
         self.node = node # ASTNode: represents the class definition node
         self._methods = []
+        self._members = []
         
     def addMethod(self, methodDef):
         assert isinstance(methodDef, MethodDef)
-        print(["addMethod", methodDef])
         self._methods.append(methodDef)
         
     def methods(self):
         return self._methods
+        
+    def addMember(self, memberDef):
+        assert isinstance(memberDef, MemberDef)
+        self._members.append(memberDef)
+        
+    def members(self):
+        return self._members
         
 class MethodDef:
     def __init__(self, classDef, identifier, arguments=[], node=None):
@@ -256,6 +261,15 @@ class MethodDef:
         self.returntype = ""
         self.node = node
         classDef.addMethod(self)
+        
+class MemberDef:
+    def __init__(self, classDef, identifier, node=None):
+        self._classDef = classDef
+        self.identifier = identifier
+        self.flags = []
+        self.membertype = ""
+        self.node = node
+        classDef.addMember(self)
         
 class FunctionDef:
     def __init__(self, identifier, arguments=[]):
@@ -346,7 +360,6 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
         for successor in node.appended:
             self.highlightAstNode(successor, length)
 
-        # if type(node) == ASTBranch:
         for child in node.children:
             self.highlightAstNode(child, length)
 
@@ -367,7 +380,6 @@ def dumpAST(nodes, level=0, depth=None):
         nodeDescr = "node: " + node.type
         if isinstance(node, Token):
             nodeDescr = node.tokenName + " - " + node.code.strip()
-        #elif isinstance(node, ASTBranch)
         print(
             str(node.row).rjust(3, "0") + ":" + str(node.col).rjust(3, "0"),
             "-",

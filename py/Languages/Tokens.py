@@ -119,9 +119,7 @@ class TokenNodePattern(NodePattern):
     def matches(self, nodes, index):
         node = nodes[index]
         expected = self._tokenName
-        # print("AJND", node, self._tokenName, node.tokenName == expected, node.code == expected)
         if isinstance(node, Token):
-            #print([node.tokenName, node.code, expected, node.tokenName == expected, node.code == expected, node.tokenName == expected or node.code == expected])
             return node.tokenName == expected or node.code == expected
         return False
         

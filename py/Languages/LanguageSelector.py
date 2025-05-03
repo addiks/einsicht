@@ -20,6 +20,9 @@ class LanguageSelector:
     def selectForMimeType(self, mimeType):
         if mimeType == "text/x-python":
             return PythonLanguage()
+            
+        if mimeType == "application/x-python-code":
+            return None # cached / compiled python bytecode
         
         if mimeType == "text/php":
             return PHPLanguage()

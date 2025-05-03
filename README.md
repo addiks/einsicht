@@ -32,6 +32,7 @@ Planned **Common** Features:
 * Git Integration
 * Line-Sorting / -Filtering
 * Formatters / Prettyfiers (JSON / YAML / ...)
+* Search & Replace
 
 Planned **Uncommon** Features:
 * Project-Indexing / -Autocompletion (Abstracted per Language)
@@ -88,4 +89,4 @@ like (f.e.: removing menus).
 And instead of taking gedit, suppressing half of the functionality (tabs) and 
 adding other functionality that gedit was never designed for, I decided to just
 build my own minimalist editor.
-I've also looked at kate (too overloaded with unwanted TU: tabs) and kwrite (no extension support).
+I've also looked at kate (too overloaded with unwanted UI: tabs) and kwrite (no extension support).

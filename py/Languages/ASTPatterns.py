@@ -25,7 +25,6 @@ class NodePattern:
         
 class OptionalNode(NodePattern):
     def __init__(self, pattern):
-        # print(pattern)
         assert isinstance(pattern, (str, ASTNode, NodePattern))
         self.pattern = pattern
 
@@ -55,15 +54,12 @@ class NodeSequence(NodePattern):
         return self._sequenceType
         
     def matches(self, nodes, index):
-        #print(["a", nodes[index], self._sequenceType])
         nodes = nodes.copy()
         for pattern in self._elements:
             if len(nodes) <= index:
                 break
-            #print(["b", nodes[index], pattern.nodeKeys(), pattern, pattern.matches(nodes, index)])
             if pattern.matches(nodes, index):
                 (replacedNodes, newNodeIndex) = pattern.mutate(nodes, index)
-                #print(["d", nodes[index], pattern.nodeKeys(), pattern, replacedNodes, newNodeIndex])
                 #if newNodeIndex == None:
                 #    return False
                 if newNodeIndex != None:
@@ -71,9 +67,7 @@ class NodeSequence(NodePattern):
             elif pattern.producedNodeKey() == nodes[index].grammarKey():
                 index += 1
             else:
-                #print(["c", nodes[index], pattern.nodeKeys(), pattern])
                 return False
-        #print(["e", index, self.nodeKeys(), self])
         return True
 
     def mutate(self, nodes, index): # return (replacedNodes, newNodeIndex)
@@ -84,16 +78,11 @@ class NodeSequence(NodePattern):
         end = index
         
         for pattern in self._elements:
-            #print([len(nodes), index])
             if len(nodes) <= index:
                 break
-            #print("a")
-            #print([pattallNewNodesern, pattern.nodeKeys(), nodes[index], pattern.matches(nodes, index)])
             if pattern.matches(nodes, index):
-                #print("b")
                 (replacedNodes, newNodeIndex) = pattern.mutate(nodes, index)
                 if newNodeIndex != None:
-                    #print(["QWE", nodes[newNodeIndex]])
                     allNewNodes.append(nodes[newNodeIndex])
                     allReplacedNodes += replacedNodes
                     start = min(start, newNodeIndex)
@@ -104,8 +93,6 @@ class NodeSequence(NodePattern):
                 start = min(start, index)
                 end = max(end, index)
                 index += 1
-                
-            #print("c")
                 
         for subIndex in reversed(range(start + 1, end + 1)):
             nodes.pop(subIndex)
@@ -133,7 +120,6 @@ class NodeBranch(NodePattern):
         
     def matches(self, nodes, index):
         nodeKey = nodes[index].grammarKey()
-        #breakpoint()
         if nodeKey in self._patternMap:
             for pattern in self._patternMap[nodeKey]:
                 if pattern.producedNodeKey() == nodes[index].grammarKey():
@@ -172,18 +158,15 @@ class RepeatingNode(NodePattern):
         if self._optional:
             return True
         else:
-            #print(["matches", self._pattern.matches(nodes, index)])
             return self._pattern.matches(nodes, index)
 
     def mutate(self, nodes, index): # return (replacedNodes, newNodeIndex)
         allReplacedNodes = []
         allNewNodes = []
-        #breakpoint()
         start = index
         end = index
         
         nodeKeys = self.nodeKeys()
-        #print(self._pattern.matches(nodes, index))
         while True:
             if len(nodes) <= index:
                 break
@@ -215,8 +198,9 @@ class RepeatingNode(NodePattern):
         return (allReplacedNodes, start)
             
 class LateDefinedASTPattern(NodePattern):
-    def __init__(self):
+    def __init__(self, producedNodeKey=None):
         self._pattern = None
+        self._producedNodeKey = producedNodeKey
         
     def definePattern(self, pattern):
         self._pattern = pattern
@@ -226,6 +210,8 @@ class LateDefinedASTPattern(NodePattern):
         return self._pattern.nodeKeys()
         
     def producedNodeKey(self): # string
+        if self._producedNodeKey != None:
+            return self._producedNodeKey
         assert isinstance(self._pattern, NodePattern)
         return self._pattern.producedNodeKey()
         

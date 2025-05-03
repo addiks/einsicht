@@ -44,6 +44,26 @@ class ASTNode:
             result.append(self)
         return result
         
+    def findInPrepended(self, selector): # list[ASTNode]
+        result = []
+        if len(self.children) > 0:
+            result = self.children[0].findInPrepended(selector)
+        for child in self.prepended:
+            result += child.find(selector)
+        if self.matches(selector):
+            result.append(self)
+        return result
+        
+    def findInAppended(self, selector): # list[ASTNode]
+        result = []
+        if len(self.children) > 0:
+            result = self.children[-1].findInAppended(selector)
+        for child in self.appended:
+            result += child.find(selector)
+        if self.matches(selector):
+            result.append(self)
+        return result
+        
     def hasParentWith(self, selector): # bool
         if self.parent != None:
             if self.parent.matches(selector):

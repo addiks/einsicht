@@ -1,7 +1,5 @@
 
-import sys
-import os
-import random
+import sys, os, random, traceback
 from PySide6 import QtCore, QtWidgets, QtGui
 from os.path import basename, dirname, abspath
 from PySide6.QtCore import Slot, QObject
@@ -27,3 +25,8 @@ if __name__ == "__main__":
         
     except FileAlreadyOpenOnOtherProcessException:
         sys.exit(0)
+
+    except Exception as exception:
+        print(exception)
+        print(traceback.format_exc())
+        sys.exit(-2)

@@ -2,15 +2,18 @@
 from threading import Lock
 import sqlite3, os, uuid, hashlib
 
+from py.Languages.LanguageSelector import LanguageSelector
+from py.Languages.Language import FileContext
+
 class ProjectIndex:
     def __init__(self, dbFilePath):
         self._dbFilePath = dbFilePath
         self._dbConnection = None
         self._lock = Lock()
         self._inQuery = False
+        self._langSelector = None
         
     def storeFileContext(self, context):
-        print("*storeFileContext*")
         for classDef in context.classes():
             self._storeClassDef(classDef, context)
             
@@ -40,6 +43,51 @@ class ProjectIndex:
         
         return []
         
+    def clear(self):
+        self._disconnect()
+        if os.path.exists(self._dbFilePath):
+            index = 0
+            newDbPath = self._dbFilePath
+            while os.path.exists(newDbPath):
+                newDbPath = self._dbFilePath + "." + str(index) + ".old.db"
+                index += 1
+            os.rename(self._dbFilePath, newDbPath)
+        
+    def indexFolder(self, folderPath, rootPath):
+        for item in os.listdir(folderPath):
+            itemPath = folderPath + "/" + item
+    
+            if os.path.isfile(itemPath):
+                self.indexFile(itemPath, rootPath)
+                
+            elif os.path.isdir(itemPath):
+                self.indexFolder(itemPath, rootPath)
+
+    def indexFile(self, filePath, projectRoot, language=None):
+        try:
+            if language == None:
+                if self._langSelector == None:
+                    self._langSelector = LanguageSelector()
+                language = self._langSelector.selectForFilePath(filePath)
+            
+            with open(filePath, "r") as handle:
+                fileContents = handle.read()
+                
+                (syntaxTree, tokens) = language.parse(fileContents)
+                
+                fileContext = FileContext(
+                    filePath, 
+                    projectRoot, 
+                    syntaxTree,
+                    language
+                )
+                
+                language.populateFileContext(fileContext)
+                self.storeFileContext(fileContext)
+                
+        except UnicodeDecodeError:
+            pass
+    
     def _storeClassDef(self, classDef, context):
         classRows = self._query(
             "SELECT id FROM classes WHERE filepath = :file AND name = :class",
@@ -73,6 +121,9 @@ class ProjectIndex:
         for methodDef in classDef.methods():
             self._storeMethodDef(methodDef, classId, context)
             
+        for memberDef in classDef.members():
+            self._storeMemberDef(memberDef, classId, context)
+            
     def _storeMethodDef(self, methodDef, classId, context):
         methodRows = self._query(
             "SELECT * FROM classes_methods WHERE class_id = :class AND name = :method",
@@ -102,6 +153,35 @@ class ProjectIndex:
                 "column": methodDef.node.col
             })
             
+    def _storeMemberDef(self, memberDef, classId, context):
+        memberRows = self._query(
+            "SELECT * FROM classes_members WHERE class_id = :class AND name = :member",
+            params={"member": memberDef.identifier, "class": classId}
+        )
+        
+        memberId = None
+        
+        if len(memberRows) > 0:
+            for memberRow in memberRows:
+                memberId = memberRow["id"]
+                
+        else:
+            memberId = uuid.uuid4().hex
+            self._query("""
+                INSERT INTO classes_members 
+                (id, class_id, name, type, flags, line, column) 
+                VALUES 
+                (:id, :class_id, :name, :type, :flags, :line, :column)
+            """, params={
+                "id": memberId,
+                "class_id": classId,
+                "name": memberDef.identifier,
+                "type": memberDef.membertype,
+                "flags": ",".join(memberDef.flags),
+                "line": memberDef.node.row,
+                "column": memberDef.node.col
+            })
+            
     def _classExists(self, identifier, filePath):
         for row in self._query(
             "SELECT 1 FROM classes WHERE filepath = :file AND name = :class",
@@ -109,6 +189,11 @@ class ProjectIndex:
         ):
             return True
         return False
+        
+    def _disconnect(self):
+        if self._dbConnection != None:
+            self._dbConnection.close()
+            self._dbConnection = None
         
     def _connection(self):
         if self._dbConnection == None:
@@ -126,13 +211,13 @@ class ProjectIndex:
         return self._dbConnection
         
     def _checkTables(self):
-        modified = False
-        modified = modified or self._ensureTableSchema("files", [
+        modifieds = []
+        modifieds.append(self._ensureTableSchema("files", [
             {"name": "filepath", "type": "VARCHAR(512)", "pk": 1},
             {"name": "hash", "type": "VARCHAR(32)"},
             {"name": "mtime", "type": "INTEGER"}
-        ])
-        modified = modified or self._ensureTableSchema("classes", [
+        ]))
+        modifieds.append(self._ensureTableSchema("classes", [
             {"name": "id", "type": "VARCHAR(32)", "pk": 1},
             {"name": "name", "type": "VARCHAR(512)", "notnull": 1},
             {"name": "namespace", "type": "VARCHAR(512)"},
@@ -141,8 +226,8 @@ class ProjectIndex:
             {"name": "language", "type": "VARCHAR(128)", "notnull": 1},
             {"name": "line", "type": "INTEGER"},
             {"name": "column", "type": "SMALLINT"}
-        ])
-        modified = modified or self._ensureTableSchema("classes_methods", [
+        ]))
+        modifieds.append(self._ensureTableSchema("classes_methods", [
             {"name": "id", "type": "VARCHAR(32)", "pk": 1},
             {"name": "class_id", "type": "VARCHAR(32)", "notnull": 1},
             {"name": "name", "type": "VARCHAR(512)", "notnull": 1},
@@ -151,18 +236,17 @@ class ProjectIndex:
             {"name": "arguments", "type": "TEXT"},
             {"name": "line", "type": "INTEGER"},
             {"name": "column", "type": "SMALLINT"}
-        ])
-        modified = modified or self._ensureTableSchema("classes_members", [
+        ]))
+        modifieds.append(self._ensureTableSchema("classes_members", [
             {"name": "id", "type": "VARCHAR(32)", "pk": 1},
             {"name": "class_id", "type": "VARCHAR(32)", "notnull": 1},
             {"name": "name", "type": "VARCHAR(512)", "notnull": 1},
             {"name": "type", "type": "VARCHAR(512)"},
             {"name": "flags", "type": "VARCHAR(512)"},
-            {"name": "filepath", "type": "VARCHAR(512)", "notnull": 1},
             {"name": "line", "type": "INTEGER"},
             {"name": "column", "type": "SMALLINT"}
-        ])
-        modified = modified or self._ensureTableSchema("functions", [
+        ]))
+        modifieds.append(self._ensureTableSchema("functions", [
             {"name": "id", "type": "VARCHAR(32)", "pk": 1},
             {"name": "name", "type": "VARCHAR(512)", "notnull": 1},
             {"name": "returntype", "type": "VARCHAR(512)"},
@@ -172,9 +256,8 @@ class ProjectIndex:
             {"name": "language", "type": "VARCHAR(128)", "notnull": 1},
             {"name": "line", "type": "INTEGER"},
             {"name": "column", "type": "SMALLINT"}
-        ])
-        if modified:
-            print("*commit*")
+        ]))
+        if min(modifieds) == True:
             self._connection().commit()
         
     def _ensureTableSchema(self, tableName, columns):
@@ -199,7 +282,7 @@ class ProjectIndex:
                     del existingColumns[column["name"]]
                     
             for columnName in existingColumns.keys():
-                self._query(f"ALTER TABLE {tableName} DROP COLUMN {columnName}")
+                self._query(f"ALTER TABLE {tableName} DROP COLUMN {columnName}", lock=False)
             
         else:
             columnDef = ""
@@ -235,7 +318,6 @@ class ProjectIndex:
         try:
             if lock:
                 self._lock.acquire()
-            #print([sql, params])
             cursor = connection.execute(sql, params)
             return cursor.fetchall()
         finally:

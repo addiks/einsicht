@@ -2,10 +2,11 @@
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat
 from PySide6.QtCore import Qt
 
+from enum import Enum
 from collections import OrderedDict
 import re, hashlib
 
-from .AbstractSyntaxTree import ASTNode, ASTBranch
+from .AbstractSyntaxTree import ASTNode, ASTBranch, ASTRoot
 from .ASTPatterns import NodePattern
 from .Tokens import Token, TokenMatcher, TokenDef
 
@@ -41,88 +42,93 @@ class Language: # abstract
     def populateFileContext(self, context):
         return []
         
-    def parse(self, code, previousAST=None, previousTokens=None): # return: [ASTNode, list(TokenNode)]
+    def autocompleTypesForNode(self, node):
+        return []
+        
+    def parse(self, code, filepath, previousAST=None, previousTokens=None): # return: [ASTNode, list(TokenNode)]
         hash = hashlib.md5(code.encode()).hexdigest()
         if hash not in self._parseCache:
+        
             tokens = self.lex(code, previousTokens)
-            #dumpAST(tokens)
             
             if len(tokens) <= 0:
                 self._parseCache[hash] = (None, tokens)
                 return self._parseCache[hash]
 
+            grammarMap = self.grammarMap()
+            
+            # Hides irrelevant tokens: comments, whitespace, ...
             tokens = self.normalize(tokens)
             
-            nodeMap = {}
-            #for index, token in tokens.items():
-            
-            for index in range(0, len(tokens)):
-                token = tokens[index]
-                
-                if token.tokenName not in nodeMap:
-                    nodeMap[token.tokenName] = []
-                nodeMap[token.tokenName].append(token)
-                
-                if token.code not in nodeMap:
-                    nodeMap[token.code] = []
-                nodeMap[token.code].append(token)
-            
             nodes = tokens.copy()
-            
-            #dumpAST(nodes)
-            
-            grammarMap = self.grammarMap()
-            while len(nodeMap) > 0:
-                hasMutated = False
-                for nodeKey in nodeMap.copy().keys():
-                    if nodeKey in grammarMap:
-                        
-                        if nodeKey not in nodeMap:
-                            continue
-                    
-                        for node in nodeMap[nodeKey].copy():
-                            for pattern in grammarMap[nodeKey]:
-                                
-                                nodeIndex = node.offsetIn(nodes)
-                                if nodeIndex == None:
-                                    break
-                                
-                                if pattern.matches(nodes, nodeIndex):
-                                    (replacedNodes, newNodeIndex) = pattern.mutate(nodes, nodeIndex)
-            
-                                    for replacedNode in replacedNodes:
-                                        hasMutated = True
-                                        
-                                        replacedNodeKey = replacedNode.grammarKey()
-                                        nodeMap[replacedNodeKey].remove(replacedNode)
-                                        if len(nodeMap[replacedNodeKey]) <= 0:
-                                            del nodeMap[replacedNodeKey]
-                                            
-                                        if replacedNode.code in nodeMap and replacedNode in nodeMap[replacedNode.code]:
-                                            nodeMap[replacedNode.code].remove(replacedNode)
-                                            if len(nodeMap[replacedNode.code]) <= 0:
-                                                del nodeMap[replacedNode.code]
-                                                
-                                    if newNodeIndex != None:
-                                        hasMutated = True
-                                        newNode = nodes[newNodeIndex]
-                                        newNodeKey = newNode.grammarKey()
-                                        if newNodeKey not in nodeMap:
-                                            nodeMap[newNodeKey] = []
-                                        nodeMap[newNodeKey].append(newNode)
-                    if nodeKey in nodeMap and len(nodeMap[nodeKey]) <= 0:
-                        del nodeMap[nodeKey]
-            
-                if not hasMutated:
-                    break
-            
+            nodes = self._applyGrammar(nodes, grammarMap)
             nodes = self.groupStatementsIntoBlocks(nodes)
             
-            #dumpAST(nodes, depth=1)
-            
-            self._parseCache[hash] = (ASTBranch(nodes, "root"), tokens)
+            self._parseCache[hash] = (ASTRoot(nodes, filepath), tokens)
         return self._parseCache[hash]
         
+    def _applyGrammar(self, nodes, grammarMap):
+        nodeMap = self._mapNodes(nodes)
+        while len(nodeMap) > 0:
+            hasMutated = False
+            for nodeKey in nodeMap.copy().keys():
+                if nodeKey in grammarMap:
+                    
+                    if nodeKey not in nodeMap:
+                        continue
+                
+                    for node in nodeMap[nodeKey].copy():
+                        for pattern in grammarMap[nodeKey]:
+                            
+                            nodeIndex = node.offsetIn(nodes)
+                            if nodeIndex == None:
+                                break
+                            
+                            if pattern.matches(nodes, nodeIndex):
+                                (replacedNodes, newNodeIndex) = pattern.mutate(nodes, nodeIndex)
+        
+                                for replacedNode in replacedNodes:
+                                    hasMutated = True
+                                    
+                                    replacedNodeKey = replacedNode.grammarKey()
+                                    nodeMap[replacedNodeKey].remove(replacedNode)
+                                    if len(nodeMap[replacedNodeKey]) <= 0:
+                                        del nodeMap[replacedNodeKey]
+                                        
+                                    if replacedNode.code in nodeMap and replacedNode in nodeMap[replacedNode.code]:
+                                        nodeMap[replacedNode.code].remove(replacedNode)
+                                        if len(nodeMap[replacedNode.code]) <= 0:
+                                            del nodeMap[replacedNode.code]
+                                            
+                                if newNodeIndex != None:
+                                    hasMutated = True
+                                    newNode = nodes[newNodeIndex]
+                                    newNodeKey = newNode.grammarKey()
+                                    if newNodeKey not in nodeMap:
+                                        nodeMap[newNodeKey] = []
+                                    nodeMap[newNodeKey].append(newNode)
+                if nodeKey in nodeMap and len(nodeMap[nodeKey]) <= 0:
+                    del nodeMap[nodeKey]
+        
+            if not hasMutated:
+                break
+                
+        return nodes
+        
+    def _mapNodes(self, nodes):
+        nodeMap = {}
+        for index in range(0, len(nodes)):
+            token = nodes[index]
+            
+            if token.tokenName not in nodeMap:
+                nodeMap[token.tokenName] = []
+            nodeMap[token.tokenName].append(token)
+            
+            if token.code not in nodeMap:
+                nodeMap[token.code] = []
+            nodeMap[token.code].append(token)
+        return nodeMap
+    
     def normalize(self, nodes):
         index = 0
         lastRelevantIndex = None # int
@@ -228,14 +234,50 @@ class Language: # abstract
                     self._grammarMap[key].append(pattern)
         return self._grammarMap
         
-class ClassDef:
-    def __init__(self, identifier, namespace=None, parents=[], flags=[], block=None, node=None):
-        self.identifier = identifier # string
+class AutocompletionType(Enum):
+    CLASS = 1
+    METHOD = 2
+    MEMBER = 3
+    FUNCTION = 4
+        
+class PositionDef:
+    def __init__(self, filepath, row, column, offset):
+        self.filepath = filepath
+        self.row = row
+        self.column = column
+        self.offset = offset
+        
+    @staticmethod
+    def fromNode(node):
+        return PositionDef(node.filepath(), node.row, node.col, node.offset)
+        
+class ComponentDef:
+    def __init__(self, name, position=None, node=None, id=None):
+        if position == None:
+            assert(node != None)
+            position = PositionDef.fromNode(node)
+        self.name = name # string
+        self.position = position # PositionDef
+        self.node = node # ASTNode: represents the class definition node
+        
+class ClassDef(ComponentDef):
+    def __init__(
+        self, 
+        name, 
+        position=None, 
+        namespace=None, 
+        parents=[], 
+        flags=[], 
+        block=None, 
+        node=None, 
+        id=None
+    ):
+        super().__init__(name, position, node, id)
+        self.name = name # string
         self.namespace = namespace # string
         self.parents = parents # list[string]
         self.flags = flags # list[string]
         self.block = block # ASTNode: represents the class code-block
-        self.node = node # ASTNode: represents the class definition node
         self._methods = []
         self._members = []
         
@@ -253,27 +295,33 @@ class ClassDef:
     def members(self):
         return self._members
         
-class MethodDef:
-    def __init__(self, classDef, identifier, arguments=[], node=None):
+class MethodDef(ComponentDef):
+    def __init__(
+        self, 
+        classDef, 
+        name, 
+        position=None, 
+        arguments=[], 
+        node=None, 
+        id=None
+    ):
+        super().__init__(name, position, node, id)
         self._classDef = classDef
-        self.identifier = identifier
         self.flags = []
         self.returntype = ""
-        self.node = node
         classDef.addMethod(self)
         
-class MemberDef:
-    def __init__(self, classDef, identifier, node=None):
+class MemberDef(ComponentDef):
+    def __init__(self, classDef, name, position=None, node=None, id=None):
+        super().__init__(name, position, node, id)
         self._classDef = classDef
-        self.identifier = identifier
         self.flags = []
         self.membertype = ""
-        self.node = node
         classDef.addMember(self)
         
-class FunctionDef:
-    def __init__(self, identifier, arguments=[]):
-        self.identifier = identifier
+class FunctionDef(ComponentDef):
+    def __init__(self, name, position=None, arguments=[], node=None, id=None):
+        super().__init__(name, position, node, id)
         self.arguments = arguments
         
 class UseDef:
@@ -322,10 +370,12 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
         self.syntaxTree = syntaxTree
         self.language = language
         self._selection = ""
+        self._reIndexTree()
 
     def updateSyntaxTree(self, syntaxTree):
         if self.syntaxTree != syntaxTree:
             self.syntaxTree = syntaxTree
+            self._reIndexTree()
             self.rehighlight()
             
     def updateSelection(self, selection):
@@ -335,8 +385,14 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
 
     def highlightBlock(self, text):
         block = self.currentBlock()
-        self._line = block.firstLineNumber() + 1
-        self.highlightAstNode(self.syntaxTree, len(text))
+        line = block.firstLineNumber() + 1
+        self._line = line
+        
+        if line in self._nodesByLine:
+            for node in self._nodesByLine[line]:
+                format = self.language.formatForNode(node)
+                if format != None:
+                    self.setFormat(node.col - 1, len(node.code), format)
         
         if len(self._selection) > 0:
             format = QTextCharFormat()
@@ -350,28 +406,28 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
                 else:
                     break
 
-    def highlightAstNode(self, node, length):
+    def _reIndexTree(self):
+        self._nodesByLine = {}
+        self._reIndexNode(self.syntaxTree)
+        
+    def _reIndexNode(self, node):
         if node == None:
             return
             
         for predecessor in node.prepended:
-            self.highlightAstNode(predecessor, length)
+            self._reIndexNode(predecessor)
 
         for successor in node.appended:
-            self.highlightAstNode(successor, length)
+            self._reIndexNode(successor)
 
         for child in node.children:
-            self.highlightAstNode(child, length)
+            self._reIndexNode(child)
 
-        # TODO: This does not work for multiline highlights
-        if node.row == self._line:
-            format = self.language.formatForNode(node)
-            if format != None:
-                self.setFormat(
-                    node.col - 1,
-                    len(node.code), 
-                    format
-                )
+        for line in range(node.row, node.lastRow() + 1):
+            if line not in self._nodesByLine:
+                self._nodesByLine[line] = []
+            self._nodesByLine[line].append(node)
+        
 
 def dumpAST(nodes, level=0, depth=None):
     if depth != None and level + 1 > depth:

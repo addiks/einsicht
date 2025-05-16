@@ -11,12 +11,14 @@ import traceback
 
 from py.Widgets.TextField import TextField
 from py.Widgets.LineNumbers import LineNumbers
+from py.Widgets.AutocompleteWidget import AutocompleteWidget
 from py.MessageBroker import MessageBroker
 from py.Languages.LanguageSelector import LanguageSelector
 from py.Languages.Language import Language, LanguageFromSyntaxTreeHighlighter
 from py.Languages.Language import FileContext
 from py.Versioning.VersioningSelector import VersioningSelector
 from py.ProjectIndex import ProjectIndex
+from py.Autocomplete.Autocompletion import Autocompletion
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
@@ -29,6 +31,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self._textChangeCounter = 0
         
         self.messageBroker = None
+        self._autocompleteWidget = None
         
         if filePath != None:
             self.openFile(filePath)
@@ -58,6 +61,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.projectIndex = None
         self.tokens = None
         self.syntaxTree = None
+        self.highlighter = None
         
     def openFile(self, filePath):
         self.filePath = abspath(filePath)
@@ -71,6 +75,8 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         handle = open(self.filePath, "r")
         self.fileContent = handle.read()
 
+        self.syntaxTree = None
+        self.highlighter = None
         if self.language != None:
             assert isinstance(self.language, Language)
             (self.syntaxTree, self.tokens) = self.language.parse(self.fileContent, None, None)
@@ -134,6 +140,10 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.updateTitle()
         self._updateDimensions()
         
+        if self._autocompleteWidget != None:
+            self._autocompleteWidget.hide()
+            self._autocompleteWidget = None
+        
         currentTextChangeCounter = self._textChangeCounter
         
         QTimer.singleShot(10, self._afterTextChanged)
@@ -151,7 +161,12 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             
     def onStoppedTyping(self):
         if self.language != None:
-            (self.syntaxTree, self.tokens) = self.language.parse(self.fileContent, self.syntaxTree, self.tokens)
+            (self.syntaxTree, self.tokens) = self.language.parse(
+                self.fileContent, 
+                self.filePath,
+                self.syntaxTree, 
+                self.tokens
+            )
             if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
                 self.highlighter.updateSyntaxTree(self.syntaxTree)
             
@@ -171,16 +186,27 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             
     def _checkAutocompleteTrigger(self):
         if self.tokens != None and self.projectIndex != None:
-            cursorPos = self.textField.textCursor().position()
-            token = self.tokenAt(cursorPos)
-            if token != None:
-                tokenPos = cursorPos - token.offset
-                prefix = token.code[:tokenPos]
-                postfix = token.code[tokenPos:]
-                
-                results = self.projectIndex.search(prefix, postfix)
-                print(results)
+            cursorPosition = self.textField.textCursor().position()
+            
+            if self._autocompleteWidget != None:
+                self._autocompleteWidget.hide()
         
+            autocompletion = Autocompletion(
+                self.language,
+                self.projectIndex,
+                self.tokens,
+                self.syntaxTree,
+                cursorPosition
+            )
+            
+            cursorPosition = self.textField.cursorRect()
+            
+            print(cursorPosition)
+            
+            self._autocompleteWidget = AutocompleteWidget(self, autocompletion)
+            self._autocompleteWidget.move(cursorPosition.bottomLeft())
+            self._autocompleteWidget.show()
+            
     def _updateDimensions(self):
         contentWidth = self.textField.contentWidth()
         contentHeight = self.textField.contentHeight()
@@ -238,12 +264,6 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     def newFile(self):
         bashScript = "/home/gerrit/workspace/Privat/adEdit/bin/adedit.sh"
         os.system(f"nohup {bashScript} > {bashScript}.log 2>&1 &")
-        
-    def tokenAt(self, position):
-        for token in self.tokens:
-            if token.offset < position and (token.offset + len(token.code)) >= position:
-                return token
-        return None
         
     def _toggleFileSearch(self):
         print("*_toggleFileSearch*")

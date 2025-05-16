@@ -4,16 +4,27 @@ class ASTNode:
         self.language = language
         self.code = code
         self.row = row
+        self._lastRow = None
         self.col = col
         self.offset = offset
         self.type = type
         self.parent = parent
         self.children = []
+        self.attributes = {}
         
         # Nodes in these two categories are part of the AST but have no semantic impact.
         # F.e.: Whitespace, Comments, ...
         self.prepended = []
         self.appended = []
+        
+    def filepath(self):
+        assert(isinstance(self.parent, ASTNode))
+        return self.parent.filepath()
+        
+    def lastRow(self):
+        if self._lastRow == None:
+            self._lastRow = self.row + self.code.count("\n")
+        return self._lastRow
 
     def prepend(self, node):
         self.prepended.append(node)
@@ -64,6 +75,19 @@ class ASTNode:
             result.append(self)
         return result
         
+    def findAtOffset(self, offset):
+        for child in self.children:
+            if child.isAtOffset(offset):
+                return child.findAtOffset(offset)
+        if self.isAtOffset(offset):
+            return self
+        return None
+            
+    def isAtOffset(self, offset):
+        if self.offset > offset:
+            return False
+        return self.offset + len(self.code) > offset
+        
     def hasParentWith(self, selector): # bool
         if self.parent != None:
             if self.parent.matches(selector):
@@ -96,6 +120,18 @@ class ASTNode:
         
     def previousChild(self, next):
         return None
+        
+    def deltaNodes(self, otherNode):
+        changedNodes = []
+        
+        return changedNodes
+        
+    def findChangedLinesFrom(self, otherNode):
+        changedLines = [] # list<int>
+        
+        
+        
+        return changedLines
 
 class ASTBranch(ASTNode):
     def __init__(self, children, type, parent=None):
@@ -133,3 +169,11 @@ class ASTBranch(ASTNode):
             return self.children[index]
         else:
             return None
+            
+class ASTRoot(ASTBranch):
+    def __init__(self, children, filepath):
+        self._filepath = filepath
+        super().__init__(children, "root")
+        
+    def filepath(self):
+        return self._filepath

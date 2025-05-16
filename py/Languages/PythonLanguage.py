@@ -2,15 +2,15 @@
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QFont
 from PySide6.QtCore import QRegularExpression, Qt
 
-from ..Language import Language, ClassDef, MethodDef, MemberDef, FunctionDef, dumpAST
+from .Language import Language, ClassDef, MethodDef, MemberDef, FunctionDef, dumpAST
 
-from ..ASTPatterns import OptionalNode, NodeSequence, RepeatingNode
-from ..ASTPatterns import NodeBranch, LateDefinedASTPattern
+from .ASTPatterns import OptionalNode, NodeSequence, RepeatingNode
+from .ASTPatterns import NodeBranch, LateDefinedASTPattern
 
-from ..Tokens import Token, KeywordsTokenMatcher, RegexMatcher
-from ..Tokens import DirectTokenMatcher, LiteralTokenMatcher, TokenNodePattern
+from .Tokens import Token, KeywordsTokenMatcher, RegexMatcher
+from .Tokens import DirectTokenMatcher, LiteralTokenMatcher, TokenNodePattern
 
-from ..SemanticASTNodes import CodeBlock, ImportNode, AsImportNode
+from .SemanticASTNodes import CodeBlock, ImportNode, AsImportNode
 
 from collections import OrderedDict
 
@@ -27,7 +27,7 @@ class PythonLanguage(Language):
                 "if", "elif", "else", "not",
                 "return", "break", "continue", 
                 "raise", "except", "try", "finally",
-                "while", "for",
+                "while", "for", "match", "case",
                 "True", "False", "None",
                 "and", "or", "xor", "not",
                 "del", "as", "in", "breakpoint"
@@ -223,8 +223,8 @@ class PythonLanguage(Language):
                 "T_IF", "T_ELSE", "T_ELIF", 
                 "T_PASS", "T_RAISE", "T_RETURN", "T_LAMBDA",
                 "T_BREAK", "T_CONTINUE",
-                "T_ASSERT", "T_DEL", "T_AS",
-                "T_WHILE", "T_FOR",
+                "T_ASSERT", "T_DEL", "T_AS", "T_IN",
+                "T_WHILE", "T_FOR", "T_MATCH", "T_CASE",
                 "T_TRY", "T_CATCH", "T_EXCEPT", "T_FINALLY",
                 "T_AND", "T_OR", "T_XOR", "T_NOT"
             ]:

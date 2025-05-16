@@ -3,7 +3,7 @@ from threading import Lock
 import sqlite3, os, uuid, hashlib
 
 from py.Languages.LanguageSelector import LanguageSelector
-from py.Languages.Language import FileContext
+from py.Languages.Language import FileContext, ClassDef, PositionDef
 
 class ProjectIndex:
     def __init__(self, dbFilePath):
@@ -12,6 +12,10 @@ class ProjectIndex:
         self._lock = Lock()
         self._inQuery = False
         self._langSelector = None
+        self._classDefs = {}
+        self._methodDefs = {}
+        self._memberDefs = {}
+        self._functionDefs = {}
         
     def storeFileContext(self, context):
         for classDef in context.classes():
@@ -35,13 +39,90 @@ class ProjectIndex:
         
         self._connection().commit()
                 
-    def search(self, prefix, postfix):
+    def search(self, prefix, postfix, node):
         
         print([prefix, postfix])
         
         connection = self._connection()
         
         return []
+        
+    def searchClasses(self, prefix, postfix): # return list<ClassDef>
+    
+        connection = self._connection()
+        
+        classRows = self._query("""
+            SELECT 
+                id, 
+                name, 
+                namespace, 
+                flags, 
+                filepath, 
+                language, 
+                line, 
+                column, 
+                offset
+            FROM classes 
+            WHERE SUBSTR(name, 0, :length) = :prefix
+        """, params={"length": len(prefix), "prefix": prefix})
+        
+        results = []
+        
+        for row in classRows:
+            results.append(ClassDef(
+                id=row[0],
+                identifier=row[1],
+                namespace=row[2],
+                flags=row[3],
+                position=PositionDef(
+                    filepath=row[4],
+                    line=row[6],
+                    column=row[7],
+                    offset=row[8]
+                )
+            ))
+            
+        return results
+        
+    def searchMethods(self, prefix, postfix): # return list<MethodDef>
+    
+        connection = self._connection()
+        
+        classRows = self._query("""
+            SELECT 
+                cm.id, 
+                cm.name, 
+                c.id,
+                c.name,
+                c.namespace, 
+                cm.flags, 
+                cm.filepath, 
+                c.language, 
+                cm.line, 
+                cm.column, 
+                cm.offset
+            FROM classes_methods cm
+            LEFT JOIN classes c ON(c.id = cm.class_id)
+            WHERE SUBSTR(cm.name, 0, :length) = :prefix
+        """, params={"length": len(prefix), "prefix": prefix})
+        
+        results = []
+        
+        for row in classRows:
+            results.append(ClassDef(
+                id=row[0],
+                identifier=row[1],
+                namespace=row[2],
+                flags=row[3],
+                position=PositionDef(
+                    filepath=row[4],
+                    line=row[6],
+                    column=row[7],
+                    offset=row[8]
+                )
+            ))
+            
+        return results
         
     def clear(self):
         self._disconnect()
@@ -73,7 +154,7 @@ class ProjectIndex:
             with open(filePath, "r") as handle:
                 fileContents = handle.read()
                 
-                (syntaxTree, tokens) = language.parse(fileContents)
+                (syntaxTree, tokens) = language.parse(fileContents, filePath)
                 
                 fileContext = FileContext(
                     filePath, 
@@ -91,7 +172,7 @@ class ProjectIndex:
     def _storeClassDef(self, classDef, context):
         classRows = self._query(
             "SELECT id FROM classes WHERE filepath = :file AND name = :class",
-            params={"file": context.filePath, "class": classDef.identifier}
+            params={"file": context.filePath, "class": classDef.name}
         )
         
         classId = None
@@ -109,13 +190,14 @@ class ProjectIndex:
                 (:id, :name, :ns, :flags, :path, :lang, :line, :column)
             """, params={
                 "id": classId,
-                "name": classDef.identifier,
+                "name": classDef.name,
                 "ns": classDef.namespace,
                 "flags": ",".join(classDef.flags),
                 "path": context.filePath,
                 "lang": context.language.name(),
                 "line": classDef.node.row,
-                "column": classDef.node.col
+                "column": classDef.node.col,
+                "offset": classDef.node.offset
             })
             
         for methodDef in classDef.methods():
@@ -127,7 +209,7 @@ class ProjectIndex:
     def _storeMethodDef(self, methodDef, classId, context):
         methodRows = self._query(
             "SELECT * FROM classes_methods WHERE class_id = :class AND name = :method",
-            params={"method": methodDef.identifier, "class": classId}
+            params={"method": methodDef.name, "class": classId}
         )
         
         methodId = None
@@ -146,17 +228,18 @@ class ProjectIndex:
             """, params={
                 "id": methodId,
                 "class_id": classId,
-                "name": methodDef.identifier,
+                "name": methodDef.name,
                 "returntype": methodDef.returntype,
                 "flags": ",".join(methodDef.flags),
                 "line": methodDef.node.row,
-                "column": methodDef.node.col
+                "column": methodDef.node.col,
+                "offset": methodDef.node.offset
             })
             
     def _storeMemberDef(self, memberDef, classId, context):
         memberRows = self._query(
             "SELECT * FROM classes_members WHERE class_id = :class AND name = :member",
-            params={"member": memberDef.identifier, "class": classId}
+            params={"member": memberDef.name, "class": classId}
         )
         
         memberId = None
@@ -175,21 +258,14 @@ class ProjectIndex:
             """, params={
                 "id": memberId,
                 "class_id": classId,
-                "name": memberDef.identifier,
+                "name": memberDef.name,
                 "type": memberDef.membertype,
                 "flags": ",".join(memberDef.flags),
                 "line": memberDef.node.row,
-                "column": memberDef.node.col
+                "column": memberDef.node.col,
+                "offset": memberDef.node.offset
             })
             
-    def _classExists(self, identifier, filePath):
-        for row in self._query(
-            "SELECT 1 FROM classes WHERE filepath = :file AND name = :class",
-            params={"file": context.filePath, "class": classDef.identifier}
-        ):
-            return True
-        return False
-        
     def _disconnect(self):
         if self._dbConnection != None:
             self._dbConnection.close()
@@ -225,7 +301,8 @@ class ProjectIndex:
             {"name": "filepath", "type": "VARCHAR(512)", "notnull": 1},
             {"name": "language", "type": "VARCHAR(128)", "notnull": 1},
             {"name": "line", "type": "INTEGER"},
-            {"name": "column", "type": "SMALLINT"}
+            {"name": "column", "type": "SMALLINT"},
+            {"name": "offset", "type": "INTEGER"}
         ]))
         modifieds.append(self._ensureTableSchema("classes_methods", [
             {"name": "id", "type": "VARCHAR(32)", "pk": 1},
@@ -235,7 +312,8 @@ class ProjectIndex:
             {"name": "flags", "type": "VARCHAR(512)"},
             {"name": "arguments", "type": "TEXT"},
             {"name": "line", "type": "INTEGER"},
-            {"name": "column", "type": "SMALLINT"}
+            {"name": "column", "type": "SMALLINT"},
+            {"name": "offset", "type": "INTEGER"}
         ]))
         modifieds.append(self._ensureTableSchema("classes_members", [
             {"name": "id", "type": "VARCHAR(32)", "pk": 1},
@@ -244,7 +322,8 @@ class ProjectIndex:
             {"name": "type", "type": "VARCHAR(512)"},
             {"name": "flags", "type": "VARCHAR(512)"},
             {"name": "line", "type": "INTEGER"},
-            {"name": "column", "type": "SMALLINT"}
+            {"name": "column", "type": "SMALLINT"},
+            {"name": "offset", "type": "INTEGER"}
         ]))
         modifieds.append(self._ensureTableSchema("functions", [
             {"name": "id", "type": "VARCHAR(32)", "pk": 1},
@@ -255,7 +334,8 @@ class ProjectIndex:
             {"name": "filepath", "type": "VARCHAR(512)", "notnull": 1},
             {"name": "language", "type": "VARCHAR(128)", "notnull": 1},
             {"name": "line", "type": "INTEGER"},
-            {"name": "column", "type": "SMALLINT"}
+            {"name": "column", "type": "SMALLINT"},
+            {"name": "offset", "type": "INTEGER"}
         ]))
         if min(modifieds) == True:
             self._connection().commit()

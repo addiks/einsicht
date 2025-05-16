@@ -31,8 +31,7 @@ if __name__ == "__main__":
         elif os.path.isfile(pathToIndex):
             index.indexFile(pathToIndex, os.path.dirname(pathToIndex))
         
-        #print("*app.exec*")
-        #sys.exit(app.exec())
+        sys.exit(app.exec())
         
     except Exception as exception:
         print(exception)

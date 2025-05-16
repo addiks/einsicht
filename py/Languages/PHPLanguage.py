@@ -1,6 +1,6 @@
 
-from py.Languages.PHP.PHPHighlighter import PHPHighlighter
-from ..Language import Language
+from .Language import Language
+
 from collections import OrderedDict
 
 class PHPLanguage(Language):
@@ -23,8 +23,8 @@ class PHPLanguage(Language):
         tokens['T_DOC_COMMENT']              = "\\/\\*\\*.*?\\*\\/" #
         tokens['T_COMMENT']                  = "(//[^\n]*?(?=\n|\\?\\>|\\%\\>)|\\#[^\n]*?(?=\n|\\?\\>|\\%\\>))|/\\*.*?\\*/" #
         tokens['T_CONCAT_EQUAL']             = "\\.=" #
-        tokens['T_CONSTANT_ENCAPSED_STRING'] = "\"(?:[^\"\\\\]|\\\\.)*\"|\'(?:[^\'\\\\]|\\\\.)*\'" #
-        tokens['T_EXECUTE_STRING']           = "\`(?:[^\`\\\\]|\\\\.)*\`"
+        # tokens['T_CONSTANT_ENCAPSED_STRING'] = "\"(?:[^\"\\\\]|\\\\.)*\"|\'(?:[^\'\\\\]|\\\\.)*\'" #
+        # tokens['T_EXECUTE_STRING']           = "\`(?:[^\`\\\\]|\\\\.)*\`"
         #tokens['T_CURLY_OPEN']               = "\\{\\$"
         tokens['T_DEC']                      = "--" #
         tokens['T_DIR']                      = "__DIR__" #
@@ -40,7 +40,7 @@ class PHPLanguage(Language):
         tokens['T_FUNCTION']                 = "c?function(?!\\w)" #
         tokens['T_FUNC_C']                   = "__FUNCTION__" #
         tokens['T_HALT_COMPILER']            = "__halt_compiler(\\w+)" #
-        tokens['T_HEREDOC']                  = "<<<\s*[\'\"]?(.*)[\'\"]?\\n.*?\\n\\1;?" #
+        # tokens['T_HEREDOC']                  = "<<<\s*[\'\"]?(.*)[\'\"]?\\n.*?\\n\\1;?" #
         tokens['T_INC']                      = "\\+\\+" #
         tokens['T_INLINE_HTML']              = "\\0WILL#NEVER~PARSE" #
         tokens['T_INT_CAST']                 = "\\(int(eger)?\\)" #
@@ -52,7 +52,7 @@ class PHPLanguage(Language):
         tokens['T_IS_NOT_EQUAL']             = "(\\!=|<>)" #
         tokens['T_IS_SMALLER_OR_EQUAL']      = "<=" #
         tokens['T_LINE']                     = "__LINE__" #
-        tokens['T_LNUMBER']                  = "(\d+|0x[0-9a-f]+)"
+        # tokens['T_LNUMBER']                  = "(\d+|0x[0-9a-f]+)"
         tokens['T_METHOD_C']                 = "__METHOD__" #
         tokens['T_MINUS_EQUAL']              = "-=" #
         tokens['T_MOD_EQUAL']                = "\\%=" #

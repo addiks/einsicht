@@ -1,7 +1,8 @@
 
 from mimetypes import MimeTypes
 
-from py.Languages.Python.PythonLanguage import PythonLanguage
+from py.Languages.PythonLanguage import PythonLanguage
+from py.Languages.PHPLanguage import PHPLanguage
 
 class LanguageSelector:
 

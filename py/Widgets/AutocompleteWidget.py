@@ -3,11 +3,54 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 import os
 
-class AutocompleteWidget(QtWidgets.QWidget):
-    def __init__(self, parent, autocompletion):
-        super().__init__(parent)
+class AutocompleteWidget(QtWidgets.QListWidget):
+    def __init__(self, editorWindow, autocompletion):
+        super().__init__(editorWindow.textField)
+        
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        # self.setFixedSize(100, 100)
+
+        self.itemActivated.connect(self.onItemActivated)
+        
+        editorWindow.textField.textChanged.connect(self.hide)
+        editorWindow.textField.selectionChanged.connect(self.hide)
+        editorWindow.textField.cursorPositionChanged.connect(self.hide)
+        
+        self.editorWindow = editorWindow
+        self.autocompletion = None
+        self.changeAutocomplete(autocompletion)
+        
+    def onItemActivated(self, item):
+        self.hide()
+        self.editorWindow.applyAutocompleOffer(item.offer)
+        
+    def changeAutocomplete(self, autocompletion):
+        if self.autocompletion == autocompletion:
+            return
+        self.clear()
+        
         self.autocompletion = autocompletion
         
-        for offer in autocompletion.provide():
-            print(offer)
+        if self.autocompletion != None:
+            hintedTexts = []
+            number = 1
+            for offer in self.autocompletion.provide():
+                if offer.text in hintedTexts:
+                    continue
+                AutocompleteWidgetItem(self, offer, number)
+                number += 1
+                hintedTexts.append(offer.text)
         
+        if self.count() > 0:
+            cursorPosition = self.editorWindow.textField.cursorRect()
+            self.move(cursorPosition.bottomLeft())
+            self.show()
+        else:
+            self.hide()
+              
+class AutocompleteWidgetItem(QtWidgets.QListWidgetItem):
+    def __init__(self, parent, autocompleteOffer, number):
+        super().__init__(str(number).rjust(3) + " " + autocompleteOffer.text, parent)
+        self.setFont(QtGui.QFont("Mono"))
+        self.offer = autocompleteOffer
+        self.number = number

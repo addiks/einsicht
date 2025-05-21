@@ -2,6 +2,8 @@
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import QTimer
 
+from py.Autocomplete.AutocompleteItemModel import AutocompleteItemModel
+
 class TextField(QtWidgets.QPlainTextEdit):
     
     def __init__(self, parent):
@@ -14,12 +16,26 @@ class TextField(QtWidgets.QPlainTextEdit):
         
         self.document().setDefaultFont(QtGui.QFont("Mono"))
         
+        self._completerItemModel = AutocompleteItemModel()
+        self._completer = QtWidgets.QCompleter(self._completerItemModel)
+        # self.setCompleter(self._completer)
+        
+        self._completer.setWidget(self)
+        
+        # self._completer.activated.connect(self.onCompletionActivated)
+        
         self.updateRequest.connect(self.onUpdateRequest)
         self.textChanged.connect(self.onTextChanged)
         self.selectionChanged.connect(self.onSelectionChanged)
-
         
         self.document().contentsChange.connect(self.onContentChange)
+        
+    def changeAutocomplete(self, autocomplete):
+        print("textField changeAutocomplete")
+        self._completerItemModel.changeAutocomplete(autocomplete)
+        
+    def onCompletionActivated(self, completion): # QString
+        pass
 
     def insertTextAt(self, position, text):
         cursor = QtGui.QTextCursor(self.document())

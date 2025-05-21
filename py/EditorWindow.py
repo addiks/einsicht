@@ -31,7 +31,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self._textChangeCounter = 0
         
         self.messageBroker = None
-        self._autocompleteWidget = None
+        self._autocompleteWidget = AutocompleteWidget(self, None)
         
         if filePath != None:
             self.openFile(filePath)
@@ -140,9 +140,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.updateTitle()
         self._updateDimensions()
         
-        if self._autocompleteWidget != None:
-            self._autocompleteWidget.hide()
-            self._autocompleteWidget = None
+        # self._autocompleteWidget.hide()
         
         currentTextChangeCounter = self._textChangeCounter
         
@@ -188,9 +186,6 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         if self.tokens != None and self.projectIndex != None:
             cursorPosition = self.textField.textCursor().position()
             
-            if self._autocompleteWidget != None:
-                self._autocompleteWidget.hide()
-        
             autocompletion = Autocompletion(
                 self.language,
                 self.projectIndex,
@@ -199,13 +194,13 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
                 cursorPosition
             )
             
-            cursorPosition = self.textField.cursorRect()
+            print("_checkAutocompleteTrigger")
+         
+            self._autocompleteWidget.changeAutocomplete(autocompletion)
             
-            print(cursorPosition)
-            
-            self._autocompleteWidget = AutocompleteWidget(self, autocompletion)
-            self._autocompleteWidget.move(cursorPosition.bottomLeft())
-            self._autocompleteWidget.show()
+    def applyAutocompleOffer(self, offer):
+        print(offer)
+        
             
     def _updateDimensions(self):
         contentWidth = self.textField.contentWidth()

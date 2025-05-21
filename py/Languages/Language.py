@@ -14,7 +14,7 @@ class Language: # abstract
 
     def __init__(self):
         self._lexCache = {}
-        self._parseCache = {}
+        self._parseCache = {} 
         self._grammarMap = None
         
     def name(self):

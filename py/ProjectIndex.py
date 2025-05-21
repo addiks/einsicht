@@ -208,7 +208,7 @@ class ProjectIndex:
             
     def _storeMethodDef(self, methodDef, classId, context):
         methodRows = self._query(
-            "SELECT * FROM classes_methods WHERE class_id = :class AND name = :method",
+            "SELECT id FROM classes_methods WHERE class_id = :class AND name = :method",
             params={"method": methodDef.name, "class": classId}
         )
         
@@ -216,7 +216,7 @@ class ProjectIndex:
         
         if len(methodRows) > 0:
             for methodRow in methodRows:
-                methodId = methodRow["id"]
+                methodId = methodRow[0]
                 
         else:
             methodId = uuid.uuid4().hex

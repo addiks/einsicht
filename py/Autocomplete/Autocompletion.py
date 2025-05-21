@@ -30,12 +30,13 @@ class Autocompletion:
         if self.prefix != "":
             for token in self.tokens:
                 if self.prefix == token.code[:len(self.prefix)]:
-                    results.append(AutocompletionOffer(
-                        self.token.offset,
-                        len(self.token.code),
-                        token.code,
-                        1000
-                    ))
+                    if len(token.code) > len(self.prefix):
+                        results.append(AutocompletionOffer(
+                            self.token.offset,
+                            len(self.token.code),
+                            token.code,
+                            1000
+                        ))
         
         for completionType in self.language.autocompleTypesForNode(self.node):
             match completionType:
@@ -75,5 +76,5 @@ class AutocompletionOffer:
         self.text = text
         self.priority = priority
         
-    def apply(self, text):
+    def apply(self, text): # TODO: BAD IDEA, redo with cursors
         return text[:self.offset] + self.text + text[self.offset + self.length:]

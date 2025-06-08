@@ -47,6 +47,28 @@ class AutocompleteWidget(QtWidgets.QListWidget):
             self.show()
         else:
             self.hide()
+            
+    def setFocus(self):
+        super().setFocus() 
+        if self.count() > 0:
+            self.item(0).setSelected(True)
+            
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Return:
+            self.onItemActivated(self.currentItem())
+            #for item in self.selectedItems():
+            #    self.onItemActivated(item)
+            #    return True 
+        elif event.key() == QtCore.Qt.Key_Up:
+            index = self.currentRow() - 1
+            if index < self.count():
+                self.setCurrentRow(index)
+        elif event.key() == QtCore.Qt.Key_Down:
+            index = self.currentRow() + 1
+            if index < self.count():
+                self.setCurrentRow(index)
+        else:
+            super().keyPressEvent(event)
               
 class AutocompleteWidgetItem(QtWidgets.QListWidgetItem):
     def __init__(self, parent, autocompleteOffer, number):
@@ -54,3 +76,8 @@ class AutocompleteWidgetItem(QtWidgets.QListWidgetItem):
         self.setFont(QtGui.QFont("Mono"))
         self.offer = autocompleteOffer
         self.number = number
+          
+    def keyPressEvent(self, event):
+        print([event.key()])
+        super().keyPressEvent(event)
+            

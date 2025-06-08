@@ -16,11 +16,11 @@ class TextField(QtWidgets.QPlainTextEdit):
         
         self.document().setDefaultFont(QtGui.QFont("Mono"))
         
-        self._completerItemModel = AutocompleteItemModel()
-        self._completer = QtWidgets.QCompleter(self._completerItemModel)
+        #self._completerItemModel = AutocompleteItemModel()
+        #self._completer = QtWidgets.QCompleter(self._completerItemModel)
         # self.setCompleter(self._completer)
         
-        self._completer.setWidget(self)
+        #self._completer.setWidget(self)
         
         # self._completer.activated.connect(self.onCompletionActivated)
         
@@ -32,7 +32,7 @@ class TextField(QtWidgets.QPlainTextEdit):
         
     def changeAutocomplete(self, autocomplete):
         print("textField changeAutocomplete")
-        self._completerItemModel.changeAutocomplete(autocomplete)
+        #self._completerItemModel.changeAutocomplete(autocomplete)
         
     def onCompletionActivated(self, completion): # QString
         pass
@@ -195,6 +195,9 @@ class TextField(QtWidgets.QPlainTextEdit):
             return True
         if event.key() == QtCore.Qt.Key_Backtab:
             self.indentOut()
+            return True
+        if event.key() == QtCore.Qt.Key_Alt and self.parent.isAutocompleteVisible():
+            self.parent.focusAutocompleteWidget()
             return True
         return super().keyPressEvent(event)
 

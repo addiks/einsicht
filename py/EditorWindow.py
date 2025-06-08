@@ -53,7 +53,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     def closeFile(self):
         self.fileContent = ""
         self.filePath = None
-        self.setWindowTitle("[No file] - adEdit")
+        self.setWindowTitle("[No file] - Einsicht")
         self.hashOnDisk = ""
         self.lengthOnDisk = 0
         self.language = None
@@ -86,7 +86,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         self.projectIndex = None
         if self.versioning != None:
-            self.projectIndex = ProjectIndex(self.versioning.metaFolder() + "/adedit.db")
+            self.projectIndex = ProjectIndex(self.versioning.metaFolder() + "/einsicht.db")
         
         self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
         self.lengthOnDisk = len(self.fileContent)
@@ -108,14 +108,14 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         modified = (len(self.fileContent) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
 
         if self.filePath == None:
-            self.setWindowTitle("[No file] - adEdit")
+            self.setWindowTitle("[No file] - Einsicht")
         elif modified:
-            self.setWindowTitle("* %s (%s) - adEdit" % (
+            self.setWindowTitle("* %s (%s) - Einsicht" % (
                 basename(self.filePath), 
                 dirname(self.filePath)
             ))
         else:
-            self.setWindowTitle("%s (%s) - adEdit" % (
+            self.setWindowTitle("%s (%s) - Einsicht" % (
                 basename(self.filePath), 
                 dirname(self.filePath)
             ))
@@ -201,6 +201,11 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     def applyAutocompleOffer(self, offer):
         print(offer)
         
+    def isAutocompleteVisible(self):
+        return self._autocompleteWidget.isVisible()
+        
+    def focusAutocompleteWidget(self):
+        self._autocompleteWidget.setFocus()
             
     def _updateDimensions(self):
         contentWidth = self.textField.contentWidth()
@@ -253,11 +258,11 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             "Text files (*.*)"
         )
         
-        bashScript = "/home/gerrit/workspace/Privat/adEdit/bin/adedit.sh"
+        bashScript = "/home/gerrit/workspace/Privat/Einsicht/bin/1s.sh"
         os.system(f"nohup {bashScript} '{filePath}' > {bashScript}.log 2>&1 &")
         
     def newFile(self):
-        bashScript = "/home/gerrit/workspace/Privat/adEdit/bin/adedit.sh"
+        bashScript = "/home/gerrit/workspace/Privat/Einsicht/bin/1s.sh"
         os.system(f"nohup {bashScript} > {bashScript}.log 2>&1 &")
         
     def _toggleFileSearch(self):

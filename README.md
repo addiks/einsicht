@@ -1,17 +1,20 @@
-adEdit – Minimalist SDI Text Editor / Mini-IDE
-===================================
-This is a text-editor built for SDI (Single Document Interface) operations, 
-made to be used with modern window-managers that allow for efficient management
-of many SDI windows. 
+Einsicht / `1s` – Intelligent Minimalist SDI Text-Viewer & -Editor / Mini-IDE
+=============================================================================
+This is a text-editor / integrated-development-environment built for SDI
+(Single Document Interface) operations, made to be used with modern window-
+managers that allow for efficient management of many single-document windows.
 
-Note: I have not yet figured out a final name for this editor.
-      There is a ~80% chance that this will be renamed in the near future,
-      I just have not figured out what I want to name it.
-Candidates are:
-* Sdiide (Single-Document-Interface Integrated-Development-Environment)
-* qtedit (A small editor written in QT) 
-* addiks-edit (It's an editor written for and by me)
-* ???
+**Currently this project is still in the very beginning and under heavy development,
+the vast majority of features are not yet implemented.**
+
+## Why the name and what's up with the "1s" abbreviation?
+I like the name for a variety of reasons:
+* It is a german word, highlighting the german origins of the project.
+* The name translates to "Insight", and it's biggest purpose is to give insight into files
+* The prefix "Ein" means "One", relating to the fact that it is a single-document-interface
+
+The abbreviation `1s` (1 = "One" = "Ein"; s => "sicht") will be used so that the editor can be
+quickly invoked from the command line. The keys "1" and "s" are very close on QWERTY keyboards.
 
 ## Implementation
 This project is written in Python, using Pyside6/Qt6 as the UI framework.
@@ -27,6 +30,7 @@ processes/documents is done using DBUS.
 * Line-Numbers
 * Syntax-Highlighting
 * Highlighting of selected words
+* AST-Parsing for implemented languages (see below)
 
 Planned **Common** Features:
 * Git Integration
@@ -34,16 +38,28 @@ Planned **Common** Features:
 * Formatters / Prettyfiers (JSON / YAML / ...)
 * Search & Replace
 
-Planned **Uncommon** Features:
+Planned **Uncommon** (for text-editors) Features:
 * Project-Indexing / -Autocompletion (Abstracted per Language)
 * Step-Debugger implementation 
   (Abstracted per Protocol. f.e.: dbgp/X-Debug for PHP)
 * Edit in multiple places at once (Multi-Cursor)
 * In-Code Warnings (f.e.: Results of static analysis)
+* Intelligent suggestions for code-completion based on big-data analysis of AST trees.
 
 Features that will **never** be implemented:
 * Document-Management using tabs
 * Additional toolbars, statusbars or other clutter in the main editor window
+
+**Implemented Languages**:
+* Python
+
+**Planned** Languages that may be implemented next (in this order):
+* Markdown
+* Shell-Script
+* XML / HTML
+* Javascipt / Typescript
+* Java or PHP (not sure which will come first, both are important to me)
+
 
 ## Why SDI?
 Most (if not all) other IDE's are written as big bulky MDI (multi-document-

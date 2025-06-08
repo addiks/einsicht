@@ -5,7 +5,7 @@ from PySide6.QtCore import Slot, QObject
 import hashlib
 from typing import Annotated, get_type_hints
 
-class FileAlreadyOpenOnOtherProcessException(Exception):
+class FileAlreadyOpenOnOtherProcessException(Exception): 
     pass
 
 class MessageBroker(QtCore.QObject):

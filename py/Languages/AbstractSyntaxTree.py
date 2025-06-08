@@ -121,8 +121,11 @@ class ASTNode:
     def previousChild(self, next):
         return None
         
-    def deltaNodes(self, otherNode):
-        changedNodes = []
+    def buildDeltaTree(self, otherNode):
+        newNode = self
+        
+        if self.code == otherNode.code and self.offset == otherNode.offset:
+            return None # No!
         
         return changedNodes
         

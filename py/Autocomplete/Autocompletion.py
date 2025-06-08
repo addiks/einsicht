@@ -76,5 +76,11 @@ class AutocompletionOffer:
         self.text = text
         self.priority = priority
         
+        
+        
+       
+                    
+                    
+        
     def apply(self, text): # TODO: BAD IDEA, redo with cursors
         return text[:self.offset] + self.text + text[self.offset + self.length:]

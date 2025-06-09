@@ -1,10 +1,11 @@
 [Desktop Entry]
+Name=Einsicht (Text-Editor)
+GenericName=Text-Editor
+Comment=Text-Editor for SDI
+StartupWMClass=Einsicht
 Version=1.0
 Type=Application
 Exec=1s
 Icon=einsicht
-Name=Einsicht (Text-Editor)
-GenericName=Text-Editor
-Comment=Text-Editor for SDI
 Terminal=false
 MimeType=text/plain;application/x-zerosize

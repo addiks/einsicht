@@ -23,7 +23,20 @@ from py.Autocomplete.Autocompletion import Autocompletion
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
     def __init__(self, filePath = None):
-        super(EditorWindow, self).__init__()
+        super(EditorWindow, self).__init__() 
+        
+        baseDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        iconPath = baseDir + "/resources/einsicht-logo-v1.512.png"
+        
+        print(iconPath)
+        
+        pixmap = QtGui.QPixmap(iconPath)
+        
+        icon = QtGui.QIcon(pixmap)
+        # icon.addFile() 
+         
+        self.setWindowIcon(icon) 
         
         self.lineNumbers = LineNumbers(self)
         self.textField = TextField(self)

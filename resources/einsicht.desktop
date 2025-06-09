@@ -1,8 +1,8 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Exec=/home/gerrit/workspace/Privat/Einsicht/bin/1s.sh
-Icon=/home/gerrit/workspace/Privat/Einsicht/resources/einsicht-logo-v1.png
+Exec=1s
+Icon=einsicht
 Name=Einsicht (Text-Editor)
 GenericName=Text-Editor
 Comment=Text-Editor for SDI

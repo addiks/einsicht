@@ -1,8 +1,10 @@
 
+import os
 from mimetypes import MimeTypes
 
 from py.Languages.PythonLanguage import PythonLanguage
 from py.Languages.PHPLanguage import PHPLanguage
+from py.Languages.MarkdownLanguage import MarkdownLanguage
 
 class LanguageSelector:
 
@@ -10,13 +12,17 @@ class LanguageSelector:
         self.mime = MimeTypes()
     
     def selectForFilePath(self, filePath):
+        language = None
+    
         (mimeType, n) = self.mime.guess_type(filePath)
+        if mimeType != None:
+            language = self.selectForMimeType(mimeType)
+            
+        fileExtension = os.path.splitext(filePath)[-1]
+        if fileExtension == ".md":
+            language = MarkdownLanguage()
         
-        if mimeType == None:
-            print("No Mime Type!")
-            return None
-        
-        return self.selectForMimeType(mimeType)
+        return language
         
     def selectForMimeType(self, mimeType):
         if mimeType == "text/x-python":

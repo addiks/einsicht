@@ -19,7 +19,10 @@ class Language: # abstract
         
     def name(self):
         raise NotImplementedError
-    
+        
+    def debugEnabled(self):
+        return False
+        
     # Returns QSyntaxHighlighter
     def syntaxHighlighter(self, document, syntaxTree):
         return LanguageFromSyntaxTreeHighlighter(document, syntaxTree, self)
@@ -63,6 +66,9 @@ class Language: # abstract
             nodes = tokens.copy()
             nodes = self._applyGrammar(nodes, grammarMap)
             nodes = self.groupStatementsIntoBlocks(nodes)
+            
+            if self.debugEnabled():
+                dumpAST(nodes)
             
             self._parseCache[hash] = (ASTRoot(nodes, filepath), tokens)
         return self._parseCache[hash]

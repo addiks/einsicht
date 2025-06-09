@@ -1,6 +1,6 @@
 
-from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QFont
-from PySide6.QtCore import QRegularExpression, Qt
+from PySide6.QtGui import QTextCharFormat, QFont
+from PySide6.QtCore import Qt
 
 from .Language import Language, ClassDef, MethodDef, MemberDef, FunctionDef, dumpAST
 
@@ -50,7 +50,11 @@ class PythonLanguage(Language):
 
     def isNodeRelevantForGrammar(self, node): # boolean
         if isinstance(node, Token):
-            if node.tokenName in ["T_WHITESPACE", "T_COMMENT", "T_INDENTATION"]:
+            if node.tokenName in [
+                "T_WHITESPACE", 
+                "T_COMMENT", 
+                "T_INDENTATION"
+            ]:
                 return False
         return True
 

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="100cm"
+   height="100cm"
+   viewBox="0 0 3543.3071 3543.3071"
+   id="svg2"
+   version="1.1"
+   inkscape:version="1.4.2 (ebf0e940d0, 2025-05-08)"
+   sodipodi:docname="einsicht-logo-sketch.svg"
+   inkscape:export-filename="einsicht-logo-sketch.png"
+   inkscape:export-xdpi="13.0048"
+   inkscape:export-ydpi="13.0048"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <defs
+     id="defs4">
+    <rect
+       x="348.57143"
+       y="577.14286"
+       width="314.28573"
+       height="348.57146"
+       id="rect1" />
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="0.21590661"
+     inkscape:cx="1672.0192"
+     inkscape:cy="1880.4427"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     units="m"
+     inkscape:window-width="1620"
+     inkscape:window-height="1087"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:showpageshadow="2"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1" />
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Ebene 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(0,2490.9449)">
+    <text
+       xml:space="preserve"
+       transform="matrix(23.049848,0,0,25.092148,-8016.4179,-18012.725)"
+       id="text1"
+       style="font-size:192px;text-align:start;writing-mode:lr-tb;direction:ltr;white-space:pre;shape-inside:url(#rect1);display:inline;fill:#000000;fill-opacity:1"><tspan
+         x="348.57227"
+         y="754.74258"
+         id="tspan3"><tspan
+           style="font-weight:bold;font-family:FreeSerif;-inkscape-font-specification:'FreeSerif Bold'"
+           id="tspan2">1</tspan></tspan></text>
+    <ellipse
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:162.218;stroke-dasharray:none;stroke-opacity:1"
+       id="path1"
+       cx="1161.7601"
+       cy="-572.39294"
+       rx="1012.2577"
+       ry="983.63519" />
+    <rect
+       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:129.627;stroke-dasharray:none;stroke-opacity:1"
+       id="rect2"
+       width="325.65817"
+       height="1297.9943"
+       x="931.53674"
+       y="1788.1917"
+       transform="matrix(0.54249035,-0.84006203,0.85738029,0.51468343,0,0)" />
+    <rect
+       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:222.105;stroke-dasharray:none;stroke-opacity:1"
+       id="rect3"
+       width="928.01678"
+       height="1501.7814"
+       x="677.83374"
+       y="-1326.5096" />
+    <ellipse
+       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:132.537;stroke-dasharray:none;stroke-opacity:1"
+       id="path4"
+       cx="3123.7083"
+       cy="-1048.9919"
+       rx="112.02311"
+       ry="162.75488"
+       transform="matrix(0.86481738,0.50208654,-0.5613576,0.82757334,0,0)" />
+  </g>
+</svg>

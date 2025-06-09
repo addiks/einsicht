@@ -1,11 +1,10 @@
 [Desktop Entry]
-Encoding=UTF-8
 Version=1.0
 Type=Application
 Exec=/home/gerrit/workspace/Privat/Einsicht/bin/1s.sh
 Icon=/home/gerrit/workspace/Privat/Einsicht/resources/einsicht-logo-v1.png
-Name=Einsicht
+Name=Einsicht (Text-Editor)
 GenericName=Text-Editor
 Comment=Text-Editor for SDI
 Terminal=false
-MimeType=text/txt;text/xml;text/x-python
+MimeType=text/plain;application/x-zerosize

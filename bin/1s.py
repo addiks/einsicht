@@ -12,7 +12,7 @@ from py.MessageBroker import MessageBroker, FileAlreadyOpenOnOtherProcessExcepti
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])
-    app.setApplicationName("Einsicht - 1s")
+    app.setApplicationDisplayName("Einsicht - 1s")
     app.setDesktopFileName("einsicht")
     
     filePath = None

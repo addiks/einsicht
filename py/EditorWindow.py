@@ -12,6 +12,7 @@ import traceback
 from py.Widgets.TextField import TextField
 from py.Widgets.LineNumbers import LineNumbers
 from py.Widgets.AutocompleteWidget import AutocompleteWidget
+from py.Widgets.SearchBar import SearchBar
 from py.MessageBroker import MessageBroker
 from py.Languages.LanguageSelector import LanguageSelector
 from py.Languages.Language import Language, LanguageFromSyntaxTreeHighlighter
@@ -27,16 +28,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         baseDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
-        iconPath = baseDir + "/resources/einsicht-logo-v1.512.png"
-        
-        print(iconPath)
-        
-        pixmap = QtGui.QPixmap(iconPath)
-        
-        icon = QtGui.QIcon(pixmap)
-        # icon.addFile() 
-         
-        self.setWindowIcon(icon) 
+        self.setWindowIcon(QtGui.QIcon(QtGui.QPixmap(baseDir + "/resources/einsicht-logo-v1.512.png"))) 
         
         self.lineNumbers = LineNumbers(self)
         self.textField = TextField(self)
@@ -52,11 +44,25 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             self.closeFile()
 
         self.centralWidget = QtWidgets.QWidget()
-        self.centralWidget.layout = QtWidgets.QHBoxLayout(self.centralWidget)
-        self.centralWidget.layout.setSpacing(0)
-        self.centralWidget.layout.setContentsMargins(0, 0, 0, 0)
-        self.centralWidget.layout.addWidget(self.lineNumbers, 0)
-        self.centralWidget.layout.addWidget(self.textField, 0)
+
+        vbox = QtWidgets.QVBoxLayout(self.centralWidget)
+        vbox.setSpacing(0)
+        vbox.setContentsMargins(0, 0, 0, 0)
+
+        hboxWidget = QtWidgets.QWidget()
+        hbox = QtWidgets.QHBoxLayout(hboxWidget)
+        hboxWidget.layout = hbox
+        hbox.setSpacing(0)
+        hbox.setContentsMargins(0, 0, 0, 0)
+        hbox.addWidget(self.lineNumbers, 0)
+        hbox.addWidget(self.textField, 0)
+        
+        self.searchBar = SearchBar(self);
+        searchBarLayout = QtWidgets.QHBoxLayout(self.searchBar)
+        
+        vbox.addWidget(self.searchBar)
+        vbox.addWidget(hboxWidget)
+        self.centralWidget.layout = vbox
         self.setCentralWidget(self.centralWidget)
         
         self._initMenu()
@@ -121,14 +127,14 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         modified = (len(self.fileContent) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
 
         if self.filePath == None:
-            self.setWindowTitle("[No file] - Einsicht")
+            self.setWindowTitle("[No file]")
         elif modified:
-            self.setWindowTitle("* %s (%s) - Einsicht" % (
+            self.setWindowTitle("* %s (%s)" % (
                 basename(self.filePath), 
                 dirname(self.filePath)
             ))
         else:
-            self.setWindowTitle("%s (%s) - Einsicht" % (
+            self.setWindowTitle("%s (%s)" % (
                 basename(self.filePath), 
                 dirname(self.filePath)
             ))
@@ -206,18 +212,16 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
                 self.syntaxTree,
                 cursorPosition
             )
-            
-            print("_checkAutocompleteTrigger")
          
             self._autocompleteWidget.changeAutocomplete(autocompletion)
             
     def applyAutocompleOffer(self, offer):
-        print(offer)
+        offer.applyToTextField(self.textField)
         
     def isAutocompleteVisible(self):
         return self._autocompleteWidget.isVisible()
         
-    def focusAutocompleteWidget(self):
+    def focusAutocompleteWidget(self):  
         self._autocompleteWidget.setFocus()
             
     def _updateDimensions(self):
@@ -280,6 +284,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
     def _toggleFileSearch(self):
         print("*_toggleFileSearch*")
+        self.searchBar.toggle()
         
     def _initMenu(self):
         

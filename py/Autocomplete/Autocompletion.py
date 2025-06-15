@@ -30,7 +30,7 @@ class Autocompletion:
         if self.prefix != "":
             for token in self.tokens:
                 if self.prefix == token.code[:len(self.prefix)]:
-                    if len(token.code) > len(self.prefix):
+                    if len(token.code) > len(self.prefix) and len(token.code.strip()) > 0:
                         results.append(AutocompletionOffer(
                             self.token.offset,
                             len(self.token.code),
@@ -76,10 +76,19 @@ class AutocompletionOffer:
         self.text = text
         self.priority = priority
         
+    def applyToTextField(self, textField):
+        print(self)
+        print(textField) 
         
+        print(self.offset)
+        print(self.length)
+        print(self.text)
         
-       
-                    
+        if self.length > 0:
+            textField.removeTextAt(self.offset + self.length, self.length)
+        textField.insertTextAt(self.offset, self.text)
+        
+        textField.setFocus()
                     
         
     def apply(self, text): # TODO: BAD IDEA, redo with cursors

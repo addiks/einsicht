@@ -22,6 +22,7 @@ class AutocompleteWidget(QtWidgets.QListWidget):
         
     def onItemActivated(self, item):
         self.hide()
+        print(item)
         self.editorWindow.applyAutocompleOffer(item.offer)
         
     def changeAutocomplete(self, autocompletion):

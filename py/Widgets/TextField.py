@@ -31,7 +31,7 @@ class TextField(QtWidgets.QPlainTextEdit):
         self.document().contentsChange.connect(self.onContentChange)
         
     def changeAutocomplete(self, autocomplete):
-        print("textField changeAutocomplete")
+        print("textField changeAutocomplete") 
         #self._completerItemModel.changeAutocomplete(autocomplete)
         
     def onCompletionActivated(self, completion): # QString

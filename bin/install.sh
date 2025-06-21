@@ -1,12 +1,12 @@
 #!/bin/bash
 
+set -e
+set -x
+
 BASEDIR="` dirname $( dirname $( realpath $0 ) ) `"
 DESKTOP_DIR="$HOME/.local/share/applications"
 ICON_DIR="$HOME/.local/share/icons/hicolor"
 BIN_DIR="$HOME/.local/bin"
-
-set -e
-set -x
 
 mkdir -p "$BIN_DIR"
 mkdir -p "$DESKTOP_DIR"
@@ -21,3 +21,4 @@ ln -sf "$BASEDIR/resources/einsicht-logo-v1.512.png" "$ICON_DIR/512x512/apps/ein
 chmod +x "$BIN_DIR/1s"
 
 update-desktop-database "$HOME/.local/share/applications"
+

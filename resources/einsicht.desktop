@@ -7,5 +7,5 @@ Version=1.0
 Type=Application
 Exec=1s
 Icon=einsicht
-Terminal=false 
-MimeType=text/plain;text/markdown;text/x-python;application/x-desktop;application/x-zerosize
+Terminal=false
+MimeType=text/plain;text/markdown;text/x-python;application/x-desktop;application/x-zerosize;image/svg+xml;application/x-shellscript

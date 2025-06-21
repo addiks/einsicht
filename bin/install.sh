@@ -22,3 +22,14 @@ chmod +x "$BIN_DIR/1s"
 
 update-desktop-database "$HOME/.local/share/applications"
 
+(
+    ENV_BIN="$BASEDIR/env/bin"
+    PYTHON="$ENV_BIN/python3"
+    PIP="$ENV_BIN/pip3"
+    
+    source "$ENV_BIN/activate"
+    
+    $PYTHON $PIP install systemd systemd-python
+)
+
+

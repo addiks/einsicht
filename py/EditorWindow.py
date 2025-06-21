@@ -8,6 +8,8 @@ import os
 import hashlib
 import re
 import traceback
+import logging
+from systemd.journal import JournalHandler
 
 from py.Widgets.TextField import TextField
 from py.Widgets.LineNumbers import LineNumbers
@@ -20,15 +22,17 @@ from py.Languages.Language import FileContext
 from py.Versioning.VersioningSelector import VersioningSelector
 from py.ProjectIndex import ProjectIndex
 from py.Autocomplete.Autocompletion import Autocompletion
+from py.Logger import Logger
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
-    def __init__(self, filePath = None):
+    def __init__(self, app, filePath = None):
         super(EditorWindow, self).__init__() 
+        self.app = app
         
-        baseDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
-        self.setWindowIcon(QtGui.QIcon(QtGui.QPixmap(baseDir + "/resources/einsicht-logo-v1.512.png"))) 
+        self.setWindowIcon(QtGui.QIcon(QtGui.QPixmap(
+            app.baseDir() + "/resources/einsicht-logo-v1.512.png"
+        )))
         
         self.lineNumbers = LineNumbers(self)
         self.textField = TextField(self)
@@ -115,12 +119,20 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.updateTitle()
         
     def saveFile(self):
-        handle = open(self.filePath, "w")
-        handle.write(self.fileContent)
-        self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
-        self.lengthOnDisk = len(self.fileContent)
-        self.updateTitle()
-        self._updateProjectIndex()
+        print("open(" + self.filePath + ")")
+        try:
+            with open(self.filePath, "w") as handle:
+                print("write(" + str(len(self.fileContent)) + ")")
+                handle.write(self.fileContent)
+                self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
+                self.lengthOnDisk = len(self.fileContent)
+            self.updateTitle()
+            self.app.info("Saved file '%s'" % self.filePath)
+            self._updateProjectIndex()
+        except:
+            e = sys.exc_info()[0]
+            self.app.info("While saving file: %s" % e)
+            raise
 
     def updateTitle(self):
         textHash = hashlib.md5(self.fileContent.encode()).hexdigest()
@@ -278,10 +290,6 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         bashScript = "/home/gerrit/workspace/Privat/Einsicht/bin/1s.sh"
         os.system(f"nohup {bashScript} '{filePath}' > {bashScript}.log 2>&1 &")
         
-    def newFile(self):
-        bashScript = "/home/gerrit/workspace/Privat/Einsicht/bin/1s.sh"
-        os.system(f"nohup {bashScript} > {bashScript}.log 2>&1 &")
-        
     def _toggleFileSearch(self):
         print("*_toggleFileSearch*")
         self.searchBar.toggle()
@@ -297,7 +305,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         newAction = fileMenu.addAction('New')
         newAction.setShortcut('Ctrl+N')
         newAction.setStatusTip('New')
-        newAction.triggered.connect(self.newFile)
+        newAction.triggered.connect(self.app.newFile)
         
         openAction = fileMenu.addAction('Open')
         openAction.setShortcut('Ctrl+O')

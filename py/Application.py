@@ -1,5 +1,5 @@
 
-import sys, os, traceback, logging
+import sys, os, traceback, logging, hashlib
 
 from systemd.journal import JournalHandler
 
@@ -12,6 +12,12 @@ from py.EditorWindow import EditorWindow
 from py.MessageBroker import MessageBroker, FileAlreadyOpenOnOtherProcessException
 from py.Versioning.VersioningSelector import VersioningSelector
 
+from py.Languages.LanguageSelector import LanguageSelector
+from py.Versioning.VersioningSelector import VersioningSelector
+from py.ProjectIndex import ProjectIndex
+from py.Languages.Language import Language
+from py.Languages.Language import FileContext
+from py.Log import Log
 
 class Application(QtWidgets.QApplication):
     _instance = None
@@ -20,19 +26,16 @@ class Application(QtWidgets.QApplication):
     def main(argv):
         try:
             app = Application.instance()
-            try:
-                return app.run(argv)
-                
-            except FileAlreadyOpenOnOtherProcessException:
-                return 0
-        
-            except Exception as exception:
-                app.error(exception)
-                app.error(traceback.format_exc())
-                
-        except Exception as exception:
-            print(exception)
-            print(traceback.format_exc())
+            return app.run(argv)
+            
+        except FileAlreadyOpenOnOtherProcessException:
+            return 0
+    
+        except:
+            exception = sys.exc_info()[0]
+            Log.error(exception)
+            Log.error(traceback.format_exc())
+            
         return -2
         
     @staticmethod
@@ -45,10 +48,6 @@ class Application(QtWidgets.QApplication):
         super().__init__([])
         self.setApplicationDisplayName("Einsicht - 1s")
         self.setDesktopFileName("einsicht")
-        
-        self.logger = logging.getLogger('einsicht')
-        self.logger.setLevel(logging.DEBUG)
-        self.logger.addHandler(JournalHandler(SYSLOG_IDENTIFIER='einsicht'))
         
         self._versioningSelector = VersioningSelector()
         self.messageBroker = None
@@ -71,6 +70,7 @@ class Application(QtWidgets.QApplication):
         self.tokens = None
         self.syntaxTree = None
         self.highlighter = None
+        Log.setPrefix(self.fileNameDescription())
             
     def run(self, argv):
         filePath = None
@@ -79,17 +79,17 @@ class Application(QtWidgets.QApplication):
         
         if filePath != None:
             self.openFile(filePath)
-            self.info("Opened file '" + filePath + "'")
+            Log.info("Opened file '" + filePath + "'")
         else:
             self._reset()
             self.window.onFileClosed()
-            self.info("Opened empty file")
+            Log.info("Opened empty file")
 
         self.window.show()
         
         exitCode = self.exec() # Qt execution loop
         
-        self.info("Qt exited with code " + str(exitCode))
+        Log.info("Qt exited with code " + str(exitCode))
     
         return exitCode
                 
@@ -102,13 +102,16 @@ class Application(QtWidgets.QApplication):
         self.filePath = abspath(filePath)
         self.messageBroker = MessageBroker(self)
         
-        document = self.textField.document()
+        Log.setPrefix(self.fileNameDescription() + ' - ')
+        
+        document = self.window.textField.document()
         
         selector = LanguageSelector()
         self.language = selector.selectForFilePath(self.filePath)
         
         with open(self.filePath, "r") as handle:
             self.fileContent = handle.read()
+            Log.debug("Read " + str(len(self.fileContent)) + " bytes")
 
         self.syntaxTree = None
         self.highlighter = None
@@ -131,20 +134,17 @@ class Application(QtWidgets.QApplication):
         self.window.onFileOpened()
         
     def saveFile(self):
-        self.info("open(" + self.filePath + ")")
         try:
             with open(self.filePath, "w") as handle:
-                self.info("write(" + str(len(self.fileContent)) + ")")
                 handle.write(self.fileContent)
                 self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
                 self.lengthOnDisk = len(self.fileContent)
             self.window.updateTitle()
-            self.info("Saved file '%s'" % self.filePath)
+            Log.debug("Saved file '%s'" % self.filePath)
             self._updateProjectIndex()
-            self.info("Updated project index")
+            Log.debug("Updated project index")
         except:
-            e = sys.exc_info()[0]
-            self.info("While saving file: %s" % e)
+            Log.error("While saving file: %s" % Log.normalize(sys.exc_info()[1]))
             raise
             
     def _updateProjectIndex(self):
@@ -235,13 +235,6 @@ class Application(QtWidgets.QApplication):
         
     def _bashScript(self):
         return self.baseDir() + "/bin/1s.sh"
-        
-    def info(self, message):
-        self.logger.info(self.fileNameDescription() + ' - ' + message)
-        
-    def error(self, message):
-        self.logger.error(self.fileNameDescription() + ' - ' + message)
-        
         
     def baseDir(self):
         return dirname(dirname(abspath(__file__)))

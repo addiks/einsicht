@@ -22,7 +22,6 @@ from py.Languages.Language import FileContext
 from py.Versioning.VersioningSelector import VersioningSelector
 from py.ProjectIndex import ProjectIndex
 from py.Autocomplete.Autocompletion import Autocompletion
-from py.Logger import Logger
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
@@ -38,6 +37,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.textField = TextField(self, app)
         self._textChangeCounter = 0
         
+        self.highlighter = None
         self.messageBroker = None
         self._autocompleteWidget = AutocompleteWidget(self, None)
         
@@ -71,6 +71,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
     def onFileOpened(self):
         self.updateTitle()
+        document = self.textField.document()
         document.setPlainText(self.app.fileContent)
         
     def updateTitle(self):
@@ -97,6 +98,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     def onTextChanged(self):
         self.updateTitle()
         self._updateDimensions()
+        self.app.onFileContentChanged()
         
         # self._autocompleteWidget.hide()
         

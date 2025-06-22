@@ -21,6 +21,11 @@ This project is written in Python, using Pyside6/Qt6 as the UI framework.
 Every open document runs in it's own process, communication between 
 processes/documents is done using DBUS.
 
+Logs are sent to systemd-journal and can be viewed using this command:
+```bash
+journalctl -f SYSLOG_IDENTIFIER=einsicht
+```
+
 ## Features
 **Implemented** Features:
 * Open/Edit/Save ASCII files

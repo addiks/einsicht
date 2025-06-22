@@ -26,7 +26,7 @@ from py.Logger import Logger
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
-    def __init__(self, app, filePath = None):
+    def __init__(self, app):
         super(EditorWindow, self).__init__() 
         self.app = app
         
@@ -34,19 +34,13 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             app.baseDir() + "/resources/einsicht-logo-v1.512.png"
         )))
         
-        self.lineNumbers = LineNumbers(self)
-        self.textField = TextField(self)
-        self._versioningSelector = VersioningSelector()
+        self.lineNumbers = LineNumbers(self, app)
+        self.textField = TextField(self, app)
         self._textChangeCounter = 0
         
         self.messageBroker = None
         self._autocompleteWidget = AutocompleteWidget(self, None)
         
-        if filePath != None:
-            self.openFile(filePath)
-        else:
-            self.closeFile()
-
         self.centralWidget = QtWidgets.QWidget()
 
         vbox = QtWidgets.QVBoxLayout(self.centralWidget)
@@ -71,84 +65,26 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         self._initMenu()
         
-        QTimer.singleShot(10, lambda: self.onTextChanged(force=True))
-        
-    def closeFile(self):
-        self.fileContent = ""
-        self.filePath = None
+    def onFileClosed(self):
         self.setWindowTitle("[No file] - Einsicht")
-        self.hashOnDisk = ""
-        self.lengthOnDisk = 0
-        self.language = None
-        self.versioning = None
-        self.projectIndex = None
-        self.tokens = None
-        self.syntaxTree = None
         self.highlighter = None
         
-    def openFile(self, filePath):
-        self.filePath = abspath(filePath)
-        self.messageBroker = MessageBroker(self)
-        
-        document = self.textField.document()
-        
-        selector = LanguageSelector()
-        self.language = selector.selectForFilePath(self.filePath)
-        
-        handle = open(self.filePath, "r")
-        self.fileContent = handle.read()
-
-        self.syntaxTree = None
-        self.highlighter = None
-        if self.language != None:
-            assert isinstance(self.language, Language)
-            (self.syntaxTree, self.tokens) = self.language.parse(self.fileContent, None, None)
-            self.highlighter = self.language.syntaxHighlighter(document, self.syntaxTree)
-        
-        self.versioning = self._versioningSelector.selectVersioningFor(self.filePath)
-        
-        self.projectIndex = None
-        if self.versioning != None:
-            self.projectIndex = ProjectIndex(self.versioning.metaFolder() + "/einsicht.db")
-        
-        self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
-        self.lengthOnDisk = len(self.fileContent)
-        
-        document.setPlainText(self.fileContent)
-        
+    def onFileOpened(self):
         self.updateTitle()
+        document.setPlainText(self.app.fileContent)
         
-    def saveFile(self):
-        print("open(" + self.filePath + ")")
-        try:
-            with open(self.filePath, "w") as handle:
-                print("write(" + str(len(self.fileContent)) + ")")
-                handle.write(self.fileContent)
-                self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
-                self.lengthOnDisk = len(self.fileContent)
-            self.updateTitle()
-            self.app.info("Saved file '%s'" % self.filePath)
-            self._updateProjectIndex()
-        except:
-            e = sys.exc_info()[0]
-            self.app.info("While saving file: %s" % e)
-            raise
-
     def updateTitle(self):
-        textHash = hashlib.md5(self.fileContent.encode()).hexdigest()
-        modified = (len(self.fileContent) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
-
-        if self.filePath == None:
+        if self.app.filePath == None:
             self.setWindowTitle("[No file]")
-        elif modified:
+        elif self.app.isModified():
             self.setWindowTitle("* %s (%s)" % (
-                basename(self.filePath), 
-                dirname(self.filePath)
+                basename(self.app.filePath), 
+                dirname(self.app.filePath)
             ))
         else:
             self.setWindowTitle("%s (%s)" % (
-                basename(self.filePath), 
-                dirname(self.filePath)
+                basename(self.app.filePath), 
+                dirname(self.app.filePath)
             ))
         
     def presentSelf(self):
@@ -158,75 +94,26 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     def onUpdate(self, rect, dy):
         self.lineNumbers.onUpdate(rect, dy)
         
-    def onTextChanged(self, force=False):
-        doc = self.textField.document()
-        fileContent = doc.toPlainText()
-        
-        if fileContent == self.fileContent and not force:
-            return
-        
-        self._textChangeCounter += 1
-        
-        self.fileContent = fileContent
+    def onTextChanged(self):
         self.updateTitle()
         self._updateDimensions()
         
         # self._autocompleteWidget.hide()
         
-        currentTextChangeCounter = self._textChangeCounter
-        
-        QTimer.singleShot(10, self._afterTextChanged)
-        QTimer.singleShot(250, lambda: self._checkStoppedTyping(currentTextChangeCounter))
-           
-    def _afterTextChanged(self):
+    def afterTextChanged(self):
         self.setMinimumWidth(0)
         self.setMinimumHeight(0)
         self.setMaximumWidth(16777215)
         self.setMaximumHeight(16777215)
         
-    def _checkStoppedTyping(self, textChangeCounter):
-        if textChangeCounter == self._textChangeCounter:
-            self.onStoppedTyping()
-            
     def onStoppedTyping(self):
-        if self.language != None:
-            (self.syntaxTree, self.tokens) = self.language.parse(
-                self.fileContent, 
-                self.filePath,
-                self.syntaxTree, 
-                self.tokens
-            )
-            if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
-                self.highlighter.updateSyntaxTree(self.syntaxTree)
-            
-            self._checkAutocompleteTrigger()
-                    
-    def _updateProjectIndex(self):
-        if self.syntaxTree != None and self.projectIndex != None:
-            context = FileContext(
-                self.filePath, 
-                self.versioning.projectRoot(), 
-                self.syntaxTree,
-                self.language
-            )
-            
-            self.language.populateFileContext(context)
-            self.projectIndex.storeFileContext(context)
-            
-    def _checkAutocompleteTrigger(self):
-        if self.tokens != None and self.projectIndex != None:
-            cursorPosition = self.textField.textCursor().position()
-            
-            autocompletion = Autocompletion(
-                self.language,
-                self.projectIndex,
-                self.tokens,
-                self.syntaxTree,
-                cursorPosition
-            )
-         
-            self._autocompleteWidget.changeAutocomplete(autocompletion)
-            
+        if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
+            self.highlighter.updateSyntaxTree(self.syntaxTree)
+        
+    def onNewSyntaxTree(self):
+        if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
+            self.highlighter.updateSyntaxTree(self.app.syntaxTree)
+                
     def applyAutocompleOffer(self, offer):
         offer.applyToTextField(self.textField)
         
@@ -235,6 +122,9 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
     def focusAutocompleteWidget(self):  
         self._autocompleteWidget.setFocus()
+        
+    def changeAutocomplete(self, autocompletion):
+        self._autocompleteWidget.changeAutocomplete(autocompletion)
             
     def _updateDimensions(self):
         contentWidth = self.textField.contentWidth()
@@ -279,17 +169,6 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         if self.highlighter != None:
             self.highlighter.updateSelection(text)
             
-    def showOpenFilePicker(self):
-        (filePath, fileTypeDescr) = QtWidgets.QFileDialog.getOpenFileName(
-            self, 
-            "Open File", 
-            dirname(self.filePath),
-            "Text files (*.*)"
-        )
-        
-        bashScript = "/home/gerrit/workspace/Privat/Einsicht/bin/1s.sh"
-        os.system(f"nohup {bashScript} '{filePath}' > {bashScript}.log 2>&1 &")
-        
     def _toggleFileSearch(self):
         print("*_toggleFileSearch*")
         self.searchBar.toggle()
@@ -310,17 +189,17 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         openAction = fileMenu.addAction('Open')
         openAction.setShortcut('Ctrl+O')
         openAction.setStatusTip('Open')
-        openAction.triggered.connect(self.showOpenFilePicker)
+        openAction.triggered.connect(self.app.showOpenFilePicker)
         
         saveAction = fileMenu.addAction('Save')
         saveAction.setShortcut('Ctrl+S')
         saveAction.setStatusTip('Save')
-        saveAction.triggered.connect(self.saveFile)
+        saveAction.triggered.connect(self.app.saveFile)
         
         quitAction = fileMenu.addAction('Quit')
         quitAction.setShortcut('Ctrl+Q')
         quitAction.setStatusTip('Quit')
-        quitAction.triggered.connect(self.close)
+        quitAction.triggered.connect(self.app.closeFile)
         
         ########
         ### EDIT
@@ -354,11 +233,11 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         ##############
         ### VERSIONING
-        if self.versioning != None:
-            versioningMenu = menuBar.addMenu(self.versioning.name())
+        if self.app.versioning != None:
+            versioningMenu = menuBar.addMenu(self.app.versioning.name())
             
             versioningGuiAction = versioningMenu.addAction('Open UI')
-            versioningGuiAction.triggered.connect(self.versioning.openUI)
+            versioningGuiAction.triggered.connect(self.app.versioning.openUI)
         
         #############
         ### DEBUGGING
@@ -370,5 +249,5 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         ############
         ### LANGUAGE
-        if self.language != None:
-            languageMenu = menuBar.addMenu(self.language.name())
+        if self.app.language != None:
+            languageMenu = menuBar.addMenu(self.app.language.name())

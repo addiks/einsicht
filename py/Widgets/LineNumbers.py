@@ -6,14 +6,15 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 class LineNumbers(QtWidgets.QWidget):
     
-    def __init__(self, editor):
+    def __init__(self, editor, app):
         QtWidgets.QWidget.__init__(self, parent=editor)
         self.editor = editor
+        self.app = app
         
         # self.editor.textField.updateRequest.connect(self.update)
         
     def sizeHint(self):
-        text = self.editor.fileContent
+        text = self.app.fileContent
     	
         lineCount = text.count("\n") + 1
     	

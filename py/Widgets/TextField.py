@@ -6,8 +6,9 @@ from py.Autocomplete.AutocompleteItemModel import AutocompleteItemModel
 
 class TextField(QtWidgets.QPlainTextEdit):
     
-    def __init__(self, parent):
+    def __init__(self, parent, app):
         QtWidgets.QPlainTextEdit.__init__(self, parent)
+        self.app = app
         
         self.parent = parent
         self._selectionChangeCounter = 0

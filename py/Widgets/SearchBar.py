@@ -7,6 +7,8 @@ class SearchBar(QtWidgets.QWidget):
         super().__init__()
         self.hide()
         
+        self.editorWindow = editorWindow
+        
         hbox = QtWidgets.QHBoxLayout(self)
         self.layout = hbox
         hbox.setSpacing(0)
@@ -27,4 +29,6 @@ class SearchBar(QtWidgets.QWidget):
     def onTextChanged(self): 
         print("onTextChanged")
         print(self.lineEdit.text())
+        
+        document = self.editorWindow.textField.document()
         

@@ -34,8 +34,7 @@ class Log:
         message = Log._prepareMessage(message)
         if Log._logger != None:
             Log._logger.error(message)
-        else:
-            print(message)
+        print(message)
         
     @staticmethod
     def normalize(target):

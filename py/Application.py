@@ -8,7 +8,7 @@ from os.path import basename, dirname, abspath
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import QTimer
 
-from py.EditorWindow import EditorWindow
+from py.Widgets.EditorWindow import EditorWindow
 from py.MessageBroker import MessageBroker, FileAlreadyOpenOnOtherProcessException
 from py.Versioning.VersioningSelector import VersioningSelector
 
@@ -213,6 +213,7 @@ class Application(QtWidgets.QApplication):
             self.window.changeAutocomplete(autocompletion)
             
     def showOpenFilePicker(self):
+        Log.debug("FOO")
         (filePath, fileTypeDescr) = QtWidgets.QFileDialog.getOpenFileName(
             self, 
             "Open File", 

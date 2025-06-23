@@ -22,6 +22,7 @@ from py.Languages.Language import FileContext
 from py.Versioning.VersioningSelector import VersioningSelector
 from py.ProjectIndex import ProjectIndex
 from py.Autocomplete.Autocompletion import Autocompletion
+from py.Qt import connect_safely
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
@@ -73,6 +74,20 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.updateTitle()
         document = self.textField.document()
         document.setPlainText(self.app.fileContent)
+        
+        if self.app.language != None:
+            self.languageMenu.setTitle(self.app.language.name())
+            self.languageMenu.setVisible(True)
+        else:
+            self.languageMenu.setVisible(False)
+            
+        if self.app.versioning != None:
+            self.versioningMenu.setTitle(self.app.versioning.name())
+            self.versioningGuiAction.setEnabled(True)
+            connect_safely(self.versioningGuiAction.triggered, self.app.versioning.openUI)
+        else:
+            self.versioningMenu.setTitle("Versioning")
+            self.versioningGuiAction.setEnabled(False)
         
     def updateTitle(self):
         if self.app.filePath == None:
@@ -186,22 +201,22 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         newAction = fileMenu.addAction('New')
         newAction.setShortcut('Ctrl+N')
         newAction.setStatusTip('New')
-        newAction.triggered.connect(self.app.newFile)
+        connect_safely(newAction.triggered, self.app.newFile)
         
         openAction = fileMenu.addAction('Open')
         openAction.setShortcut('Ctrl+O')
         openAction.setStatusTip('Open')
-        openAction.triggered.connect(self.app.showOpenFilePicker)
+        connect_safely(openAction.triggered, self.app.showOpenFilePicker)
         
         saveAction = fileMenu.addAction('Save')
         saveAction.setShortcut('Ctrl+S')
         saveAction.setStatusTip('Save')
-        saveAction.triggered.connect(self.app.saveFile)
+        connect_safely(saveAction.triggered, self.app.saveFile)
         
         quitAction = fileMenu.addAction('Quit')
         quitAction.setShortcut('Ctrl+Q')
         quitAction.setStatusTip('Quit')
-        quitAction.triggered.connect(self.app.closeFile)
+        connect_safely(quitAction.triggered, self.app.closeFile)
         
         ########
         ### EDIT
@@ -209,13 +224,13 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         deleteLineAction = editMenu.addAction('Delete line')
         deleteLineAction.setShortcut('Ctrl+D')
-        deleteLineAction.triggered.connect(self.textField.deleteCurrentLines)
+        connect_safely(deleteLineAction.triggered, self.textField.deleteCurrentLines)
 
         indentInAction = editMenu.addAction('Indent in')
-        indentInAction.triggered.connect(self.textField.indentIn)
+        connect_safely(indentInAction.triggered, self.textField.indentIn)
 
         indentOutAction = editMenu.addAction('Indent out')
-        indentOutAction.triggered.connect(self.textField.indentOut)
+        connect_safely(indentOutAction.triggered, self.textField.indentOut)
 
         replaceInFileAction = editMenu.addAction('Search and Replace')
         
@@ -225,7 +240,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         searchInFileAction = searchMenu.addAction('Search in this File')
         searchInFileAction.setShortcut('Ctrl+F')
-        searchInFileAction.triggered.connect(self._toggleFileSearch)
+        connect_safely(searchInFileAction.triggered, self._toggleFileSearch)
         
         searchInOpenFilesAction = searchMenu.addAction('Search in all open Files')
         searchInOpenFilesAction.setShortcut('Ctrl+Shift+F')
@@ -236,11 +251,17 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         ##############
         ### VERSIONING
         if self.app.versioning != None:
-            versioningMenu = menuBar.addMenu(self.app.versioning.name())
-            
-            versioningGuiAction = versioningMenu.addAction('Open UI')
-            versioningGuiAction.triggered.connect(self.app.versioning.openUI)
+            self.versioningMenu = menuBar.addMenu(self.app.versioning.name())
+        else:
+            self.versioningMenu = menuBar.addMenu('Versioning')
         
+        self.versioningGuiAction = self.versioningMenu.addAction('Open UI')
+        if self.app.versioning != None:
+            self.versioningGuiAction.setEnabled(True)
+            connect_safely(self.versioningGuiAction.triggered, self.app.versioning.openUI)
+        else:
+            self.versioningGuiAction.setEnabled(False)
+       
         #############
         ### DEBUGGING
         debuggingMenu = menuBar.addMenu('Debugging')
@@ -252,4 +273,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         ############
         ### LANGUAGE
         if self.app.language != None:
-            languageMenu = menuBar.addMenu(self.app.language.name())
+            self.languageMenu = menuBar.addMenu(self.app.language.name())
+        else:
+            self.languageMenu = menuBar.addMenu("Language")
+            self.languageMenu.setVisible(False)

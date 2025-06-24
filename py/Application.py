@@ -17,6 +17,7 @@ from py.Versioning.VersioningSelector import VersioningSelector
 from py.ProjectIndex import ProjectIndex
 from py.Languages.Language import Language
 from py.Languages.Language import FileContext
+from py.Autocomplete.Autocompletion import Autocompletion
 from py.Log import Log
 
 class Application(QtWidgets.QApplication):
@@ -200,7 +201,7 @@ class Application(QtWidgets.QApplication):
                
     def _checkAutocompleteTrigger(self):
         if self.tokens != None and self.projectIndex != None:
-            cursorPosition = self.textField.textCursor().position()
+            cursorPosition = self.window.textField.textCursor().position()
             
             autocompletion = Autocompletion(
                 self.language,

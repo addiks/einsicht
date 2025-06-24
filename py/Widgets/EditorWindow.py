@@ -23,6 +23,7 @@ from py.Versioning.VersioningSelector import VersioningSelector
 from py.ProjectIndex import ProjectIndex
 from py.Autocomplete.Autocompletion import Autocompletion
 from py.Qt import connect_safely
+from py.Log import Log
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
@@ -124,12 +125,12 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.setMaximumHeight(16777215)
         
     def onStoppedTyping(self):
-        if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
-            self.highlighter.updateSyntaxTree(self.syntaxTree)
+        if isinstance(self.app.highlighter, LanguageFromSyntaxTreeHighlighter):
+            self.app.highlighter.updateSyntaxTree(self.app.syntaxTree)
         
     def onNewSyntaxTree(self):
-        if isinstance(self.highlighter, LanguageFromSyntaxTreeHighlighter):
-            self.highlighter.updateSyntaxTree(self.app.syntaxTree)
+        if isinstance(self.app.highlighter, LanguageFromSyntaxTreeHighlighter):
+            self.app.highlighter.updateSyntaxTree(self.app.syntaxTree)
                 
     def applyAutocompleOffer(self, offer):
         offer.applyToTextField(self.textField)
@@ -183,8 +184,8 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
                self.textField.insertTextAt(position+added, indention)
                
     def onSelectionChanged(self, position, anchor, text):
-        if self.highlighter != None:
-            self.highlighter.updateSelection(text)
+        if self.app.highlighter != None:
+            self.app.highlighter.updateSelection(text)
             
     def _toggleFileSearch(self):
         print("*_toggleFileSearch*")

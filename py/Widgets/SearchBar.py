@@ -30,5 +30,22 @@ class SearchBar(QtWidgets.QWidget):
         print("onTextChanged")
         print(self.lineEdit.text())
         
-        document = self.editorWindow.textField.document()
+        pattern = self.lineEdit.text()
         
+        document = self.editorWindow.textField.document()
+        text = doc.toPlainText()
+        offset = 0
+        results = []
+       
+        position = text.find(pattern, offset)
+        while position >= offset:
+            results.append(SearchOccurence(position, pattern, pattern))
+            position = text.find(pattern, offset)
+            
+        self.editorWindow.updateInlineSearchResults(results)
+            
+class SearchOccurence:
+    def __init__(self, offset, pattern, text):
+        self.offset = offset
+        self.pattern = pattern
+        self.text = text

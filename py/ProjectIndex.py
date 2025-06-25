@@ -1,6 +1,8 @@
 
-from threading import Lock
 import sqlite3, os, uuid, hashlib
+
+from threading import Lock
+from PySide6.QtCore import QTimer
 
 from py.Languages.LanguageSelector import LanguageSelector
 from py.Languages.Language import FileContext, ClassDef, PositionDef
@@ -16,6 +18,7 @@ class ProjectIndex:
         self._methodDefs = {}
         self._memberDefs = {}
         self._functionDefs = {}
+        self._autoDisconnectDelayCounter = 0
         
     def storeFileContext(self, context):
         for classDef in context.classes():
@@ -23,7 +26,7 @@ class ProjectIndex:
             
         handle = open(context.filePath, "r")
         fileContents = handle.read()
-            
+        
         self._query("""
             INSERT INTO files 
             (filepath, hash, mtime)
@@ -284,6 +287,9 @@ class ProjectIndex:
                     self._checkTables()
             finally:
                 self._lock.release()
+        self._autoDisconnectDelayCounter += 1
+        triggeredCounter = self._autoDisconnectDelayCounter
+        QTimer.singleShot(5000, lambda: self._checkDelayedAutoDisconnect(triggeredCounter))
         return self._dbConnection
         
     def _checkTables(self):
@@ -404,3 +410,7 @@ class ProjectIndex:
             self._inQuery = False
             if lock:
                 self._lock.release()
+                
+    def _checkDelayedAutoDisconnect(self, triggeredCounter):
+        if self._autoDisconnectDelayCounter == triggeredCounter:
+            self._disconnect()

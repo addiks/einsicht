@@ -56,7 +56,7 @@ class TextField(QtWidgets.QPlainTextEdit):
         position = cursor.position()
         
         doc = self.document()
-        text = doc.toPlainText();
+        text = doc.toPlainText()
         
         if anchor == position:
             column = 0

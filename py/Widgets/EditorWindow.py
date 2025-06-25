@@ -191,6 +191,9 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         print("*_toggleFileSearch*")
         self.searchBar.toggle()
         
+    def updateInlineSearchResults(self, occurences):
+        pass
+        
     def _initMenu(self):
         
         menuBar = self.menuBar()

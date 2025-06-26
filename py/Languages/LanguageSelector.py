@@ -5,7 +5,7 @@ from mimetypes import MimeTypes
 from py.Languages.PythonLanguage import PythonLanguage
 from py.Languages.PHPLanguage import PHPLanguage
 from py.Languages.MarkdownLanguage import MarkdownLanguage
-from py.Log import Log
+from py.Hub import Log
 
 class LanguageSelector:
 

@@ -258,13 +258,9 @@ class PositionDef:
         return PositionDef(node.filepath(), node.row, node.col, node.offset)
         
 class ComponentDef:
-    def __init__(self, name, position=None, node=None, id=None):
-        if position == None:
-            assert(node != None)
-            position = PositionDef.fromNode(node)
+    def __init__(self, name, position=None, id=None):
         self.name = name # string
         self.position = position # PositionDef
-        self.node = node # ASTNode: represents the class definition node
         
 class ClassDef(ComponentDef):
     def __init__(
@@ -275,10 +271,9 @@ class ClassDef(ComponentDef):
         parents=[], 
         flags=[], 
         block=None, 
-        node=None, 
         id=None
     ):
-        super().__init__(name, position, node, id)
+        super().__init__(name, position, id)
         self.name = name # string
         self.namespace = namespace # string
         self.parents = parents # list[string]
@@ -308,26 +303,25 @@ class MethodDef(ComponentDef):
         name, 
         position=None, 
         arguments=[], 
-        node=None, 
         id=None
     ):
-        super().__init__(name, position, node, id)
+        super().__init__(name, position, id)
         self._classDef = classDef
         self.flags = []
         self.returntype = ""
         classDef.addMethod(self)
         
 class MemberDef(ComponentDef):
-    def __init__(self, classDef, name, position=None, node=None, id=None):
-        super().__init__(name, position, node, id)
+    def __init__(self, classDef, name, position=None, id=None):
+        super().__init__(name, position, id)
         self._classDef = classDef
         self.flags = []
         self.membertype = ""
         classDef.addMember(self)
         
 class FunctionDef(ComponentDef):
-    def __init__(self, name, position=None, arguments=[], node=None, id=None):
-        super().__init__(name, position, node, id)
+    def __init__(self, name, position=None, arguments=[], id=None):
+        super().__init__(name, position, id)
         self.arguments = arguments
         
 class UseDef:

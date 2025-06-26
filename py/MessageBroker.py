@@ -40,11 +40,10 @@ class MessageBroker(QtCore.QObject):
         )
         
     @Slot(str, result=str)
-    def test(self, arg):
+    def test(self, arg: str) -> str:
         return "foo " + arg
         
     @Slot()
-    def presentSelf(self):
+    def presentSelf(self) -> None:
         self.editorWindow.presentSelf()
-        pass
         

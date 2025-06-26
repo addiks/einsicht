@@ -2,7 +2,7 @@
 import sys, os, traceback, logging, hashlib
 
 from systemd.journal import JournalHandler
-
+from typing import Any, Self
 from os.path import basename, dirname, abspath
 
 from PySide6 import QtCore, QtWidgets, QtGui
@@ -18,13 +18,13 @@ from py.ProjectIndex import ProjectIndex
 from py.Languages.Language import Language
 from py.Languages.Language import FileContext
 from py.Autocomplete.Autocompletion import Autocompletion
-from py.Log import Log
+from py.Hub import Hub, Log, Application as ApplicationInterface
 
-class Application(QtWidgets.QApplication):
+class Application(QtWidgets.QApplication, ApplicationInterface):
     _instance = None
 
     @staticmethod
-    def main(argv):
+    def main(argv: list[str]) -> int:
         try:
             app = Application.instance()
             return app.run(argv)
@@ -40,7 +40,7 @@ class Application(QtWidgets.QApplication):
         return -2
         
     @staticmethod
-    def instance():
+    def instance() -> Self:
         if Application._instance == None:
             Application._instance = Application()
         return Application._instance
@@ -49,6 +49,10 @@ class Application(QtWidgets.QApplication):
         super().__init__([])
         self.setApplicationDisplayName("Einsicht - 1s")
         self.setDesktopFileName("einsicht")
+        
+        self.hub = Hub()
+        self.hub.registerSingleton(self)
+        self.hub.register(ApplicationInterface, self)
         
         self._versioningSelector = VersioningSelector()
         self.messageBroker = None
@@ -60,7 +64,7 @@ class Application(QtWidgets.QApplication):
 
         QTimer.singleShot(10, lambda: self.onFileContentChanged(force=True))
         
-    def _reset(self):
+    def _reset(self) -> None:
         self.fileContent = ""
         self.filePath = None
         self.hashOnDisk = ""
@@ -73,7 +77,7 @@ class Application(QtWidgets.QApplication):
         self.highlighter = None
         Log.setPrefix(self.fileNameDescription())
             
-    def run(self, argv):
+    def run(self, argv: list[str]) -> int:
         filePath = None
         if len(sys.argv) > 1:
             filePath = abspath(sys.argv[1])
@@ -94,12 +98,12 @@ class Application(QtWidgets.QApplication):
     
         return exitCode
                 
-    def closeFile(self):
+    def closeFile(self) -> None:
         self._reset()
         self.window.onFileClosed()
         self.info("Closed file")
         
-    def openFile(self, filePath):
+    def openFile(self, filePath: str) -> None:
         self.filePath = abspath(filePath)
         self.messageBroker = MessageBroker(self)
         
@@ -134,7 +138,7 @@ class Application(QtWidgets.QApplication):
         
         self.window.onFileOpened()
         
-    def saveFile(self):
+    def saveFile(self) -> None:
         try:
             with open(self.filePath, "w") as handle:
                 handle.write(self.fileContent)
@@ -148,7 +152,7 @@ class Application(QtWidgets.QApplication):
             Log.error("While saving file: %s" % Log.normalize(sys.exc_info()[1]))
             raise
             
-    def _updateProjectIndex(self):
+    def _updateProjectIndex(self) -> None:
         if self.syntaxTree != None and self.projectIndex != None:
             context = FileContext(
                 self.filePath, 
@@ -160,12 +164,12 @@ class Application(QtWidgets.QApplication):
             self.language.populateFileContext(context)
             self.projectIndex.storeFileContext(context)
                  
-    def isModified(self):
+    def isModified(self) -> bool:
         textHash = hashlib.md5(self.fileContent.encode()).hexdigest()
         modified = (len(self.fileContent) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
         return modified
         
-    def onFileContentChanged(self, force=False):
+    def onFileContentChanged(self, force: bool = False) -> None:
         doc = self.window.textField.document()
         fileContent = doc.toPlainText()
         
@@ -182,14 +186,14 @@ class Application(QtWidgets.QApplication):
         QTimer.singleShot(10, self.window.afterTextChanged)
         QTimer.singleShot(250, lambda: self._checkStoppedTyping(currentTextChangeCounter))
            
-    def _checkStoppedTyping(self, textChangeCounter):
+    def _checkStoppedTyping(self, textChangeCounter: int) -> None:
         if textChangeCounter == self._textChangeCounter:
             self.onStoppedTyping()
             self.window.onStoppedTyping()
         self._checkAutocompleteTrigger()
         
             
-    def onStoppedTyping(self):
+    def onStoppedTyping(self) -> None:
         if self.language != None:
             (self.syntaxTree, self.tokens) = self.language.parse(
                 self.fileContent, 
@@ -199,7 +203,7 @@ class Application(QtWidgets.QApplication):
             )
             self.window.onNewSyntaxTree()
                
-    def _checkAutocompleteTrigger(self):
+    def _checkAutocompleteTrigger(self) -> None:
         if self.tokens != None and self.projectIndex != None:
             cursorPosition = self.window.textField.textCursor().position()
             
@@ -216,7 +220,7 @@ class Application(QtWidgets.QApplication):
     def showOpenFilePicker(self):
         Log.debug("FOO")
         (filePath, fileTypeDescr) = QtWidgets.QFileDialog.getOpenFileName(
-            self, 
+            self.window, 
             "Open File", 
             dirname(self.filePath),
             "Text files (*.*)"
@@ -225,19 +229,19 @@ class Application(QtWidgets.QApplication):
         bashScript = self._bashScript()
         os.system(f"nohup {bashScript} '{filePath}' > {bashScript}.log 2>&1 &")
         
-    def newFile(self):
+    def newFile(self) -> None:
         bashScript = self._bashScript()
         os.system(f"nohup {bashScript} > {bashScript}.log 2>&1 &")
         
-    def fileNameDescription(self):
+    def fileNameDescription(self) -> str:
         if self.filePath == None:
             return "[no file]"
         else:
             return basename(self.filePath)
         
-    def _bashScript(self):
+    def _bashScript(self) -> str:
         return self.baseDir() + "/bin/1s.sh"
         
-    def baseDir(self):
+    def baseDir(self) -> str:
         return dirname(dirname(abspath(__file__)))
         

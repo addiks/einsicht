@@ -7,7 +7,7 @@ from systemd.journal import JournalHandler
 sys.path.append(dirname(dirname(abspath(__file__))))
 
 from py.Application import Application
-from py.Log import Log
+from py.Hub import Log
 
 if __name__ == "__main__":
     

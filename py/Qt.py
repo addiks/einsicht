@@ -1,22 +1,26 @@
 
 import sys
-from py.Log import Log
+
+from typing import Self, Callable
+from PySide6.QtCore import SignalInstance
+
+from py.Hub import Log
 
 class SafeHandler:
-    _instances = []
+    _instances: list[Self] = []
     
-    def __init__(self, event, handler):
+    def __init__(self, event: SignalInstance, handler: Callable) -> None:
         SafeHandler._instances.append(self)
-        self.event = event
         self.handler = handler
         event.connect(self.receive)
         
-    def receive(self, *args):
+    def receive(self, *args: list) -> None:
         try:
             self.handler(*args)
         except:
             exception = sys.exc_info()[1]
-            Log.error(exception)
-        
-def connect_safely(event, handler):
+            Log.error(exception) 
+         
+def connect_safely(event: SignalInstance, handler: Callable):
     SafeHandler(event, handler)
+  

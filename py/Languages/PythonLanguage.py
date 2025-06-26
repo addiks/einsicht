@@ -2,7 +2,7 @@
 from PySide6.QtGui import QTextCharFormat, QFont
 from PySide6.QtCore import Qt
 
-from .Language import Language, ClassDef, MethodDef, MemberDef, FunctionDef, dumpAST
+from .Language import Language, PositionDef, ClassDef, MethodDef, MemberDef, FunctionDef, dumpAST
 
 from .ASTPatterns import OptionalNode, NodeSequence, RepeatingNode
 from .ASTPatterns import NodeBranch, LateDefinedASTPattern
@@ -291,7 +291,7 @@ class PythonLanguage(Language):
                 classNode.find("identifier")[0].code, 
                 namespace = pythonPath,
                 parents=list(map(lambda a: a.code, classNode.find("tuple-element"))),
-                node=classNode,
+                position=PositionDef.fromNode(classNode),
                 block=classBlock
             )
             context.addClass(classDef)
@@ -305,7 +305,7 @@ class PythonLanguage(Language):
                     classDef,
                     methodNode.children[1].code,
                     arguments=methodArguments,
-                    node=methodNode
+                    position=PositionDef.fromNode(methodNode)
                 )
                 
             for assignmentNode in classBlock.find("assignment"):
@@ -316,7 +316,7 @@ class PythonLanguage(Language):
                     MemberDef(
                         classDef,
                         propertyName,
-                        assignmentNode
+                        position=PositionDef.fromNode(assignmentNode)
                     )
                 
         for functionNode in context.syntaxTree.find("function"):
@@ -324,7 +324,8 @@ class PythonLanguage(Language):
             for element in functionNode.find("tuple-element"):
                 functionArguments.append(element.code)
             context.addFunction(FunctionDef(
-                functionNode.children[1].code,
-                functionArguments
+                name=functionNode.children[1].code,
+                position=PositionDef.fromNode(functionNode),
+                arguments=functionArguments
             ))
         

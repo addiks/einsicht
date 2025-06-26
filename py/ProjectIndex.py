@@ -5,10 +5,11 @@ from threading import Lock
 from PySide6.QtCore import QTimer
 
 from py.Languages.LanguageSelector import LanguageSelector
-from py.Languages.Language import FileContext, ClassDef, PositionDef
+from py.Languages.Language import FileContext, ClassDef, PositionDef, MethodDef, MemberDef, Language
+from py.Log import Log
 
 class ProjectIndex:
-    def __init__(self, dbFilePath):
+    def __init__(self, dbFilePath: str):
         self._dbFilePath = dbFilePath
         self._dbConnection = None
         self._lock = Lock()
@@ -19,8 +20,8 @@ class ProjectIndex:
         self._memberDefs = {}
         self._functionDefs = {}
         self._autoDisconnectDelayCounter = 0
-        
-    def storeFileContext(self, context):
+          
+    def storeFileContext(self, context: FileContext) -> None:
         for classDef in context.classes():
             self._storeClassDef(classDef, context)
             
@@ -42,7 +43,7 @@ class ProjectIndex:
         
         self._connection().commit()
                 
-    def search(self, prefix, postfix, node):
+    def search(self, prefix: str, postfix: str, node) -> list:
         
         print([prefix, postfix])
         
@@ -50,7 +51,7 @@ class ProjectIndex:
         
         return []
         
-    def searchClasses(self, prefix, postfix): # return list<ClassDef>
+    def searchClasses(self, prefix: str, postfix: str) -> list[ClassDef]:
     
         connection = self._connection()
         
@@ -87,7 +88,7 @@ class ProjectIndex:
             
         return results
         
-    def searchMethods(self, prefix, postfix): # return list<MethodDef>
+    def searchMethods(self, prefix: str, postfix: str) -> list[MethodDef]:
     
         connection = self._connection()
         
@@ -127,7 +128,7 @@ class ProjectIndex:
             
         return results
         
-    def clear(self):
+    def clear(self) -> None:
         self._disconnect()
         if os.path.exists(self._dbFilePath):
             index = 0
@@ -137,7 +138,7 @@ class ProjectIndex:
                 index += 1
             os.rename(self._dbFilePath, newDbPath)
         
-    def indexFolder(self, folderPath, rootPath):
+    def indexFolder(self, folderPath: str, rootPath: str) -> None:
         for item in os.listdir(folderPath):
             itemPath = folderPath + "/" + item
     
@@ -147,7 +148,7 @@ class ProjectIndex:
             elif os.path.isdir(itemPath):
                 self.indexFolder(itemPath, rootPath)
 
-    def indexFile(self, filePath, projectRoot, language=None):
+    def indexFile(self, filePath: str, projectRoot: str, language: Language = None) -> None:
         try:
             if language == None:
                 if self._langSelector == None:
@@ -172,7 +173,7 @@ class ProjectIndex:
         except UnicodeDecodeError:
             pass
     
-    def _storeClassDef(self, classDef, context):
+    def _storeClassDef(self, classDef: ClassDef, context: FileContext) -> None:
         classRows = self._query(
             "SELECT id FROM classes WHERE filepath = :file AND name = :class",
             params={"file": context.filePath, "class": classDef.name}
@@ -198,9 +199,9 @@ class ProjectIndex:
                 "flags": ",".join(classDef.flags),
                 "path": context.filePath,
                 "lang": context.language.name(),
-                "line": classDef.node.row,
-                "column": classDef.node.col,
-                "offset": classDef.node.offset
+                "line": classDef.position.row,
+                "column": classDef.position.column,
+                "offset": classDef.position.offset
             })
             
         for methodDef in classDef.methods():
@@ -209,7 +210,7 @@ class ProjectIndex:
         for memberDef in classDef.members():
             self._storeMemberDef(memberDef, classId, context)
             
-    def _storeMethodDef(self, methodDef, classId, context):
+    def _storeMethodDef(self, methodDef: MethodDef, classId: str, context: FileContext) -> None:
         methodRows = self._query(
             "SELECT id FROM classes_methods WHERE class_id = :class AND name = :method",
             params={"method": methodDef.name, "class": classId}
@@ -234,12 +235,12 @@ class ProjectIndex:
                 "name": methodDef.name,
                 "returntype": methodDef.returntype,
                 "flags": ",".join(methodDef.flags),
-                "line": methodDef.node.row,
-                "column": methodDef.node.col,
-                "offset": methodDef.node.offset
+                "line": methodDef.position.row,
+                "column": methodDef.position.column,
+                "offset": methodDef.position.offset
             })
             
-    def _storeMemberDef(self, memberDef, classId, context):
+    def _storeMemberDef(self, memberDef, classId: str, context: FileContext) -> None:
         memberRows = self._query(
             "SELECT * FROM classes_members WHERE class_id = :class AND name = :member",
             params={"member": memberDef.name, "class": classId}
@@ -264,21 +265,23 @@ class ProjectIndex:
                 "name": memberDef.name,
                 "type": memberDef.membertype,
                 "flags": ",".join(memberDef.flags),
-                "line": memberDef.node.row,
-                "column": memberDef.node.col,
-                "offset": memberDef.node.offset
+                "line": memberDef.position.row,
+                "column": memberDef.position.column,
+                "offset": memberDef.position.offset
             })
             
-    def _disconnect(self):
+    def _disconnect(self) -> None:
         if self._dbConnection != None:
+            Log.debug("Disconnecting Project Index DB")
             self._dbConnection.close()
             self._dbConnection = None
         
-    def _connection(self):
+    def _connection(self) -> sqlite3.Connection:
         if self._dbConnection == None:
             try:
                 self._lock.acquire()
                 if self._dbConnection == None:
+                    Log.debug("Connecting Project Index DB")
                     # if not os.path.exists(self._dbFilePath):
                     self._dbConnection = sqlite3.connect(
                         self._dbFilePath,
@@ -287,12 +290,14 @@ class ProjectIndex:
                     self._checkTables()
             finally:
                 self._lock.release()
+                
         self._autoDisconnectDelayCounter += 1
         triggeredCounter = self._autoDisconnectDelayCounter
         QTimer.singleShot(5000, lambda: self._checkDelayedAutoDisconnect(triggeredCounter))
+
         return self._dbConnection
         
-    def _checkTables(self):
+    def _checkTables(self) -> None:
         modifieds = []
         modifieds.append(self._ensureTableSchema("files", [
             {"name": "filepath", "type": "VARCHAR(512)", "pk": 1},
@@ -346,7 +351,7 @@ class ProjectIndex:
         if min(modifieds) == True:
             self._connection().commit()
         
-    def _ensureTableSchema(self, tableName, columns):
+    def _ensureTableSchema(self, tableName: str, columns: list) -> None:
         schemaModified = False
         if self._tableExists(tableName):
             existingColumns = {}
@@ -380,7 +385,7 @@ class ProjectIndex:
             schemaModified = True
         return schemaModified
         
-    def _columnToSql(self, column):
+    def _columnToSql(self, column: dict) -> str:
         columnDef = column["name"] + " " + column["type"]
         if "pk" in column and int(column["pk"]) == 1:
             columnDef += " NOT NULL PRIMARY KEY"
@@ -388,7 +393,7 @@ class ProjectIndex:
             columnDef += " NOT NULL"
         return columnDef
         
-    def _tableExists(self, tableName):
+    def _tableExists(self, tableName: str) -> bool:
         for row in self._query(
             "SELECT * FROM sqlite_master WHERE type = :type AND name = :name",
             params={"type": "table", "name": tableName},
@@ -397,13 +402,14 @@ class ProjectIndex:
             return True
         return False
         
-    def _query(self, sql, params={}, lock=True):
+    def _query(self, sql: str, params: dict = {}, lock: bool = True) -> list:
         self._inQuery = True
         connection = self._connection()
         self._inQuery = True
         try:
             if lock:
                 self._lock.acquire()
+            # Log.debug(sql)
             cursor = connection.execute(sql, params)
             return cursor.fetchall()
         finally:
@@ -411,6 +417,6 @@ class ProjectIndex:
             if lock:
                 self._lock.release()
                 
-    def _checkDelayedAutoDisconnect(self, triggeredCounter):
+    def _checkDelayedAutoDisconnect(self, triggeredCounter: int) -> None:
         if self._autoDisconnectDelayCounter == triggeredCounter:
             self._disconnect()

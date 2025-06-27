@@ -2,19 +2,21 @@
 import math 
 from PySide6 import QtCore, QtWidgets, QtGui
 
+from py.Hub import Hub
+from py.Api import FileAccess, TextField
+
 # https://stackoverflow.com/questions/50074155
 
 class LineNumbers(QtWidgets.QWidget):
     
-    def __init__(self, editor, app):
-        QtWidgets.QWidget.__init__(self, parent=editor)
-        self.editor = editor
-        self.app = app
-        
+    def __init__(self, parent: QtWidgets.QWidget, hub: Hub):
+        QtWidgets.QWidget.__init__(self, parent=parent)
+        self.hub = hub
+        self.hub.register(self)
         # self.editor.textField.updateRequest.connect(self.update)
         
     def sizeHint(self):
-        text = self.app.fileContent
+        text = self.hub.get(FileAccess).fileContent()
     	
         lineCount = text.count("\n") + 1
     	
@@ -30,7 +32,7 @@ class LineNumbers(QtWidgets.QWidget):
         painter = QtGui.QPainter(self)
         painter.fillRect(event.rect(), QtCore.Qt.lightGray)
         
-        textField = self.editor.textField
+        textField = self.hub.get(TextField)
         
         block = textField.firstVisibleBlock()
         blockNumber = block.blockNumber()

@@ -3,12 +3,15 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import QTimer
 
 from py.Autocomplete.AutocompleteItemModel import AutocompleteItemModel
+from py.Hub import Hub
+from py.Api import TextField as TextFieldApi
 
-class TextField(QtWidgets.QPlainTextEdit):
+class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
     
-    def __init__(self, parent, app):
+    def __init__(self, parent: QtWidgets.QWidget, hub: Hub):
         QtWidgets.QPlainTextEdit.__init__(self, parent)
-        self.app = app
+        self.hub = hub
+        self.hub.register(self)
         
         self.parent = parent
         self._selectionChangeCounter = 0
@@ -137,7 +140,7 @@ class TextField(QtWidgets.QPlainTextEdit):
         self.parent.onUpdate(rect, dy)
         
     def onTextChanged(self):
-        self.parent.onTextChanged()
+        self.hub.notify(self.onTextChanged)
 
     def onSelectionChanged(self):
         self._selectionChangeCounter += 1

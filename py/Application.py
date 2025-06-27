@@ -18,9 +18,10 @@ from py.ProjectIndex import ProjectIndex
 from py.Languages.Language import Language
 from py.Languages.Language import FileContext
 from py.Autocomplete.Autocompletion import Autocompletion
-from py.Hub import Hub, Log, Application as ApplicationInterface
+from py.Hub import Hub, Log
+from py.Api import FileAccess
 
-class Application(QtWidgets.QApplication, ApplicationInterface):
+class Application(QtWidgets.QApplication, FileAccess):
     _instance = None
 
     @staticmethod
@@ -51,22 +52,20 @@ class Application(QtWidgets.QApplication, ApplicationInterface):
         self.setDesktopFileName("einsicht")
         
         self.hub = Hub()
-        self.hub.registerSingleton(self)
-        self.hub.register(ApplicationInterface, self)
-        
-        self._versioningSelector = VersioningSelector()
-        self.messageBroker = None
+        self.hub.register(self)
         
         self._textChangeCounter = 0
         
         self._reset()
-        self.window = EditorWindow(self)
-
+        self.window = EditorWindow(self, self.hub)
+        self.messageBroker = None
+        self._versioningSelector = VersioningSelector(self.hub)
+        
         QTimer.singleShot(10, lambda: self.onFileContentChanged(force=True))
         
     def _reset(self) -> None:
-        self.fileContent = ""
-        self.filePath = None
+        self._fileContent = ""
+        self._filePath = None
         self.hashOnDisk = ""
         self.lengthOnDisk = 0
         self.language = None
@@ -104,48 +103,47 @@ class Application(QtWidgets.QApplication, ApplicationInterface):
         self.info("Closed file")
         
     def openFile(self, filePath: str) -> None:
-        self.filePath = abspath(filePath)
-        self.messageBroker = MessageBroker(self)
+        self._filePath = abspath(filePath)
         
         Log.setPrefix(self.fileNameDescription() + ' - ')
-        
+        self.messageBroker = MessageBroker(self, self.hub)
         document = self.window.textField.document()
         
-        selector = LanguageSelector()
-        self.language = selector.selectForFilePath(self.filePath)
+        selector = LanguageSelector(self.hub)
+        self.language = selector.selectForFilePath(self._filePath)
         
-        with open(self.filePath, "r") as handle:
-            self.fileContent = handle.read()
-            Log.debug("Read " + str(len(self.fileContent)) + " bytes")
+        with open(self._filePath, "r") as handle:
+            self._fileContent = handle.read()
+            Log.debug("Read " + str(len(self._fileContent)) + " bytes")
 
         self.syntaxTree = None
         self.highlighter = None
         if self.language != None:
             assert isinstance(self.language, Language)
-            (self.syntaxTree, self.tokens) = self.language.parse(self.fileContent, None, None)
+            (self.syntaxTree, self.tokens) = self.language.parse(self._fileContent, None, None)
             self.highlighter = self.language.syntaxHighlighter(document, self.syntaxTree)
         
-        self.versioning = self._versioningSelector.selectVersioningFor(self.filePath)
+        self.versioning = self._versioningSelector.selectVersioningFor(self._filePath)
         
         self.projectIndex = None
         if self.versioning != None:
             self.projectIndex = ProjectIndex(self.versioning.metaFolder() + "/einsicht.db")
         
-        self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
-        self.lengthOnDisk = len(self.fileContent)
+        self.hashOnDisk = hashlib.md5(self._fileContent.encode()).hexdigest()
+        self.lengthOnDisk = len(self._fileContent)
         
-        document.setPlainText(self.fileContent)
+        document.setPlainText(self._fileContent)
         
         self.window.onFileOpened()
         
     def saveFile(self) -> None:
         try:
-            with open(self.filePath, "w") as handle:
-                handle.write(self.fileContent)
-                self.hashOnDisk = hashlib.md5(self.fileContent.encode()).hexdigest()
-                self.lengthOnDisk = len(self.fileContent)
+            with open(self._filePath, "w") as handle:
+                handle.write(self._fileContent)
+                self.hashOnDisk = hashlib.md5(self._fileContent.encode()).hexdigest()
+                self.lengthOnDisk = len(self._fileContent)
             self.window.updateTitle()
-            Log.debug("Saved file '%s'" % self.filePath)
+            Log.debug("Saved file '%s'" % self._filePath)
             self._updateProjectIndex()
             Log.debug("Updated project index")
         except:
@@ -155,7 +153,7 @@ class Application(QtWidgets.QApplication, ApplicationInterface):
     def _updateProjectIndex(self) -> None:
         if self.syntaxTree != None and self.projectIndex != None:
             context = FileContext(
-                self.filePath, 
+                self._filePath, 
                 self.versioning.projectRoot(), 
                 self.syntaxTree,
                 self.language
@@ -165,20 +163,26 @@ class Application(QtWidgets.QApplication, ApplicationInterface):
             self.projectIndex.storeFileContext(context)
                  
     def isModified(self) -> bool:
-        textHash = hashlib.md5(self.fileContent.encode()).hexdigest()
-        modified = (len(self.fileContent) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
+        textHash = hashlib.md5(self._fileContent.encode()).hexdigest()
+        modified = (len(self._fileContent) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
         return modified
+        
+    def filePath(self) -> str:
+        return self._filePath
+        
+    def fileContent(self) -> str:
+        return self._fileContent
         
     def onFileContentChanged(self, force: bool = False) -> None:
         doc = self.window.textField.document()
         fileContent = doc.toPlainText()
         
-        if fileContent == self.fileContent and not force:
+        if fileContent == self._fileContent and not force:
             return
         
         self._textChangeCounter += 1
         
-        self.fileContent = fileContent
+        self._fileContent = fileContent
         self.window.onTextChanged()
 
         currentTextChangeCounter = self._textChangeCounter
@@ -196,8 +200,8 @@ class Application(QtWidgets.QApplication, ApplicationInterface):
     def onStoppedTyping(self) -> None:
         if self.language != None:
             (self.syntaxTree, self.tokens) = self.language.parse(
-                self.fileContent, 
-                self.filePath,
+                self._fileContent, 
+                self._filePath,
                 self.syntaxTree, 
                 self.tokens
             )
@@ -222,7 +226,7 @@ class Application(QtWidgets.QApplication, ApplicationInterface):
         (filePath, fileTypeDescr) = QtWidgets.QFileDialog.getOpenFileName(
             self.window, 
             "Open File", 
-            dirname(self.filePath),
+            dirname(self._filePath),
             "Text files (*.*)"
         )
         
@@ -234,10 +238,10 @@ class Application(QtWidgets.QApplication, ApplicationInterface):
         os.system(f"nohup {bashScript} > {bashScript}.log 2>&1 &")
         
     def fileNameDescription(self) -> str:
-        if self.filePath == None:
+        if self._filePath == None:
             return "[no file]"
         else:
-            return basename(self.filePath)
+            return basename(self._filePath)
         
     def _bashScript(self) -> str:
         return self.baseDir() + "/bin/1s.sh"

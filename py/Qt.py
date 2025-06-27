@@ -13,7 +13,7 @@ class SafeHandler:
         SafeHandler._instances.append(self)
         self.handler = handler
         event.connect(self.receive)
-        
+         
     def receive(self, *args: list) -> None:
         try:
             self.handler(*args)

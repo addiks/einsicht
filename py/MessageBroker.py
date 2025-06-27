@@ -5,20 +5,21 @@ from PySide6.QtCore import Slot, QObject
 import hashlib
 from typing import Annotated, get_type_hints
 
+from py.Api import FileAccess
+
 class FileAlreadyOpenOnOtherProcessException(Exception): 
     pass
 
 class MessageBroker(QtCore.QObject):
-    
-    def __init__(self, editorWindow):
-        super().__init__(editorWindow)
+    def __init__(self, parent: QtCore.QObject, hub: Hub):
+        super().__init__(parent)
+        self.hub = hub
         
-        filePath = editorWindow.filePath		
+        filePath = self.hub.get(FileAccess).filePath()	
         
         self.serviceName = "de.addiks.qtedit.file_" + hashlib.md5(
             filePath.encode('UTF-8')
         ).hexdigest()
-        self.editorWindow = editorWindow
         
         self.sessionBus = QtDBus.QDBusConnection.sessionBus()
         
@@ -45,5 +46,5 @@ class MessageBroker(QtCore.QObject):
         
     @Slot()
     def presentSelf(self) -> None:
-        self.editorWindow.presentSelf()
+        self.hub.notify(self.presentSelf)
         

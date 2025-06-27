@@ -6,7 +6,7 @@ from PySide6.QtCore import QTimer
 
 from py.Languages.LanguageSelector import LanguageSelector
 from py.Languages.Language import FileContext, ClassDef, PositionDef, MethodDef, MemberDef, Language
-from py.Log import Log
+from py.Hub import Log
 
 class ProjectIndex:
     def __init__(self, dbFilePath: str):
@@ -240,7 +240,7 @@ class ProjectIndex:
                 "offset": methodDef.position.offset
             })
             
-    def _storeMemberDef(self, memberDef, classId: str, context: FileContext) -> None:
+    def _storeMemberDef(self, memberDef: MemberDef, classId: str, context: FileContext) -> None:
         memberRows = self._query(
             "SELECT * FROM classes_members WHERE class_id = :class AND name = :member",
             params={"member": memberDef.name, "class": classId}

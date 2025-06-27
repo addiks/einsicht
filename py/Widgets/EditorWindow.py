@@ -19,24 +19,28 @@ from py.MessageBroker import MessageBroker
 from py.Languages.LanguageSelector import LanguageSelector
 from py.Languages.Language import Language, LanguageFromSyntaxTreeHighlighter
 from py.Languages.Language import FileContext
+from py.Versioning import Versioning
 from py.Versioning.VersioningSelector import VersioningSelector
 from py.ProjectIndex import ProjectIndex
 from py.Autocomplete.Autocompletion import Autocompletion
 from py.Qt import connect_safely
-from py.Log import Log
+from py.Hub import Log, Hub
+from py.Api import FileAccess
+from py.MessageBroker import MessageBroker
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
-    def __init__(self, app):
+    def __init__(self, app, hub: Hub):
         super(EditorWindow, self).__init__() 
         self.app = app
+        self.hub = hub
         
         self.setWindowIcon(QtGui.QIcon(QtGui.QPixmap(
-            app.baseDir() + "/resources/einsicht-logo-v1.512.png"
+            hub.get(FileAccess).baseDir() + "/resources/einsicht-logo-v1.512.png"
         )))
         
-        self.lineNumbers = LineNumbers(self, app)
-        self.textField = TextField(self, app)
+        self.lineNumbers = LineNumbers(self, hub)
+        self.textField = TextField(self, hub)
         self._textChangeCounter = 0
         
         self.highlighter = None
@@ -67,6 +71,18 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         self._initMenu()
         
+        def presentSelf():
+            self.activateWindow()
+            self.setFocus()
+        hub.on(MessageBroker.presentSelf, presentSelf)
+        
+        def onTextChanged():
+            self.updateTitle()
+            self._updateDimensions()
+            self.app.onFileContentChanged()
+        self.hub.on(TextField.onTextChanged)
+        
+        
     def onFileClosed(self):
         self.setWindowTitle("[No file] - Einsicht")
         self.highlighter = None
@@ -74,47 +90,28 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     def onFileOpened(self):
         self.updateTitle()
         document = self.textField.document()
-        document.setPlainText(self.app.fileContent)
-        
-        if self.app.language != None:
-            self.languageMenu.setTitle(self.app.language.name())
-            self.languageMenu.setVisible(True)
-        else:
-            self.languageMenu.setVisible(False)
-            
-        if self.app.versioning != None:
-            self.versioningMenu.setTitle(self.app.versioning.name())
-            self.versioningGuiAction.setEnabled(True)
-            connect_safely(self.versioningGuiAction.triggered, self.app.versioning.openUI)
-        else:
-            self.versioningMenu.setTitle("Versioning")
-            self.versioningGuiAction.setEnabled(False)
+        document.setPlainText(self.hub.get(FileAccess).fileContent())
         
     def updateTitle(self):
-        if self.app.filePath == None:
+    
+        file = self.hub.get(FileAccess)
+        filePath = file.filePath()
+    
+        if filePath == None:
             self.setWindowTitle("[No file]")
-        elif self.app.isModified():
+        elif file.isModified():
             self.setWindowTitle("* %s (%s)" % (
-                basename(self.app.filePath), 
-                dirname(self.app.filePath)
+                basename(filePath), 
+                dirname(filePath)
             ))
         else:
             self.setWindowTitle("%s (%s)" % (
-                basename(self.app.filePath), 
-                dirname(self.app.filePath)
+                basename(filePath), 
+                dirname(filePath)
             ))
-        
-    def presentSelf(self):
-        self.activateWindow()
-        self.setFocus()
         
     def onUpdate(self, rect, dy):
         self.lineNumbers.onUpdate(rect, dy)
-        
-    def onTextChanged(self):
-        self.updateTitle()
-        self._updateDimensions()
-        self.app.onFileContentChanged()
         
         # self._autocompleteWidget.hide()
         
@@ -202,25 +199,27 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         ### FILE
         fileMenu = menuBar.addMenu('File')
         
+        fileHandler = self.hub.get(FileAccess)
+        
         newAction = fileMenu.addAction('New')
         newAction.setShortcut('Ctrl+N')
         newAction.setStatusTip('New')
-        connect_safely(newAction.triggered, self.app.newFile)
+        connect_safely(newAction.triggered, fileHandler.newFile)
         
         openAction = fileMenu.addAction('Open')
         openAction.setShortcut('Ctrl+O')
         openAction.setStatusTip('Open')
-        connect_safely(openAction.triggered, self.app.showOpenFilePicker)
+        connect_safely(openAction.triggered, fileHandler.showOpenFilePicker)
         
         saveAction = fileMenu.addAction('Save')
         saveAction.setShortcut('Ctrl+S')
         saveAction.setStatusTip('Save')
-        connect_safely(saveAction.triggered, self.app.saveFile)
+        connect_safely(saveAction.triggered, fileHandler.saveFile)
         
         quitAction = fileMenu.addAction('Quit')
         quitAction.setShortcut('Ctrl+Q')
         quitAction.setStatusTip('Quit')
-        connect_safely(quitAction.triggered, self.app.closeFile)
+        connect_safely(quitAction.triggered, fileHandler.closeFile)
         
         ########
         ### EDIT
@@ -254,17 +253,21 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         ##############
         ### VERSIONING
-        if self.app.versioning != None:
-            self.versioningMenu = menuBar.addMenu(self.app.versioning.name())
-        else:
-            self.versioningMenu = menuBar.addMenu('Versioning')
         
+        self.versioningMenu = menuBar.addMenu('Versioning')
         self.versioningGuiAction = self.versioningMenu.addAction('Open UI')
-        if self.app.versioning != None:
-            self.versioningGuiAction.setEnabled(True)
-            connect_safely(self.versioningGuiAction.triggered, self.app.versioning.openUI)
-        else:
+        
+        def onVersioningChange():
+            if self.hub.has(Versioning):
+                self.versioningMenu.setTitle(self.hub.get(Versioning).name())
+                self.versioningMenu.setVisible(True)
+                self.versioningGuiAction.setEnabled(True)
+                connect_safely(self.versioningGuiAction.triggered, self.hub.get(Versioning).openUI)
+            else:
+                self.versioningMenu.setTitle('Versioning')
+                self.versioningMenu.setVisible(False)
             self.versioningGuiAction.setEnabled(False)
+        self.hub.on(Versioning, onVersioningChange)
        
         #############
         ### DEBUGGING
@@ -276,8 +279,15 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         ############
         ### LANGUAGE
-        if self.app.language != None:
-            self.languageMenu = menuBar.addMenu(self.app.language.name())
-        else:
-            self.languageMenu = menuBar.addMenu("Language")
-            self.languageMenu.setVisible(False)
+        
+        self.languageMenu = menuBar.addMenu("Language")
+        def onLanguageChange():
+            if self.hub.has(Language):
+                self.languageMenu.setTitle(self.hub.get(Language).name())
+                self.languageMenu.setVisible(True)
+            else:
+                self.languageMenu.setTitle("Language")
+                self.languageMenu.setVisible(False)
+        self.hub.on(Language, onLanguageChange)
+
+        

@@ -18,6 +18,7 @@ from py.ProjectIndex import ProjectIndex
 from py.Languages.Language import Language
 from py.Languages.Language import FileContext
 from py.Autocomplete.Autocompletion import Autocompletion
+from py.Widgets.TextField import TextField
 from py.Hub import Hub, Log
 from py.Api import FileAccess
 
@@ -57,11 +58,13 @@ class Application(QtWidgets.QApplication, FileAccess):
         self._textChangeCounter = 0
         
         self._reset()
-        self.window = EditorWindow(self, self.hub)
+        self.window = EditorWindow(self.hub)
         self.messageBroker = None
         self._versioningSelector = VersioningSelector(self.hub)
         
-        QTimer.singleShot(10, lambda: self.onFileContentChanged(force=True))
+        self.hub.on(TextField.onStoppedTyping, self._checkAutocompleteTrigger)
+        self.hub.on(self.hub.get(QtGui.QTextDocument).contentsChange, self._onDocumentContentsChanged)
+        QTimer.singleShot(10, lambda: self._onFileContentChanged(force=True))
         
     def _reset(self) -> None:
         self._fileContent = ""
@@ -107,7 +110,7 @@ class Application(QtWidgets.QApplication, FileAccess):
         
         Log.setPrefix(self.fileNameDescription() + ' - ')
         self.messageBroker = MessageBroker(self, self.hub)
-        document = self.window.textField.document()
+        document = self.hub.get(QtGui.QTextDocument)
         
         selector = LanguageSelector(self.hub)
         self.language = selector.selectForFilePath(self._filePath)
@@ -163,9 +166,10 @@ class Application(QtWidgets.QApplication, FileAccess):
             self.projectIndex.storeFileContext(context)
                  
     def isModified(self) -> bool:
+        if len(self._fileContent) != self.lengthOnDisk:
+            return True
         textHash = hashlib.md5(self._fileContent.encode()).hexdigest()
-        modified = (len(self._fileContent) != self.lengthOnDisk) or (textHash != self.hashOnDisk)
-        return modified
+        return (textHash != self.hashOnDisk)
         
     def filePath(self) -> str:
         return self._filePath
@@ -173,39 +177,28 @@ class Application(QtWidgets.QApplication, FileAccess):
     def fileContent(self) -> str:
         return self._fileContent
         
-    def onFileContentChanged(self, force: bool = False) -> None:
-        doc = self.window.textField.document()
+    def _onDocumentContentsChanged(self, position, removed, added):
+        self._onFileContentChanged()
+        
+    def _onFileContentChanged(self, force: bool = False) -> None:
+        doc = self.hub.get(QtGui.QTextDocument)
         fileContent = doc.toPlainText()
         
         if fileContent == self._fileContent and not force:
             return
-        
-        self._textChangeCounter += 1
-        
+    
         self._fileContent = fileContent
-        self.window.onTextChanged()
-
-        currentTextChangeCounter = self._textChangeCounter
-        
-        QTimer.singleShot(10, self.window.afterTextChanged)
-        QTimer.singleShot(250, lambda: self._checkStoppedTyping(currentTextChangeCounter))
-           
-    def _checkStoppedTyping(self, textChangeCounter: int) -> None:
-        if textChangeCounter == self._textChangeCounter:
-            self.onStoppedTyping()
-            self.window.onStoppedTyping()
-        self._checkAutocompleteTrigger()
-        
+        self._reparseFile()
             
-    def onStoppedTyping(self) -> None:
-        if self.language != None:
-            (self.syntaxTree, self.tokens) = self.language.parse(
+    def _reparseFile(self) -> None:
+        if self.hub.has(Language) != None:
+            (self.syntaxTree, self.tokens) = self.hub.get(Language).parse(
                 self._fileContent, 
                 self._filePath,
                 self.syntaxTree, 
                 self.tokens
             )
-            self.window.onNewSyntaxTree()
+            self.hub.register(self.syntaxTree)
                
     def _checkAutocompleteTrigger(self) -> None:
         if self.tokens != None and self.projectIndex != None:
@@ -218,11 +211,12 @@ class Application(QtWidgets.QApplication, FileAccess):
                 self.syntaxTree,
                 cursorPosition
             )
+            
+            self.hub.register(autocompletion)
          
             self.window.changeAutocomplete(autocompletion)
             
     def showOpenFilePicker(self):
-        Log.debug("FOO")
         (filePath, fileTypeDescr) = QtWidgets.QFileDialog.getOpenFileName(
             self.window, 
             "Open File", 

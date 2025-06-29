@@ -10,7 +10,8 @@ from .AbstractSyntaxTree import ASTNode, ASTBranch, ASTRoot
 from .ASTPatterns import NodePattern
 from .Tokens import Token, TokenMatcher, TokenDef
 
-from py.Hub import Hub
+from py.Widgets.TextField import TextField
+from py.Hub import Hub, Log
 
 class Language: # abstract
 
@@ -29,7 +30,7 @@ class Language: # abstract
         
     # Returns QSyntaxHighlighter
     def syntaxHighlighter(self, document, syntaxTree):
-        return LanguageFromSyntaxTreeHighlighter(document, syntaxTree, self)
+        return LanguageFromSyntaxTreeHighlighter(self.hub, document, syntaxTree, self)
     
     def tokenMatchers(self): # list<TokenMatcher>
         raise NotImplementedError
@@ -368,14 +369,19 @@ class FileContext:
         
 class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
     
-    def __init__(self, document, syntaxTree, language):
+    def __init__(self, hub, document, syntaxTree, language):
         super().__init__(document)
+        self.hub = hub
         self.syntaxTree = syntaxTree
         self.language = language
         self._selection = ""
+        self.hub.on(ASTRoot, self.updateSyntaxTree)
+        self.hub.on(TextField.onSelectionChanged, self.updateSelection)
         self._reIndexTree()
 
-    def updateSyntaxTree(self, syntaxTree):
+    def updateSyntaxTree(self, syntaxTree = None):
+        if syntaxTree == None and self.hub.has(ASTRoot):
+            syntaxTree = self.hub.get(ASTRoot)
         if self.syntaxTree != syntaxTree:
             self.syntaxTree = syntaxTree
             self._reIndexTree()

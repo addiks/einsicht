@@ -19,6 +19,7 @@ from py.MessageBroker import MessageBroker
 from py.Languages.LanguageSelector import LanguageSelector
 from py.Languages.Language import Language, LanguageFromSyntaxTreeHighlighter
 from py.Languages.Language import FileContext
+from py.Languages.AbstractSyntaxTree import ASTRoot
 from py.Versioning import Versioning
 from py.Versioning.VersioningSelector import VersioningSelector
 from py.ProjectIndex import ProjectIndex
@@ -30,14 +31,25 @@ from py.MessageBroker import MessageBroker
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
 
-    def __init__(self, app, hub: Hub):
+    def __init__(self, hub: Hub):
         super(EditorWindow, self).__init__() 
-        self.app = app
         self.hub = hub
+        
+        hub.register(self)
         
         self.setWindowIcon(QtGui.QIcon(QtGui.QPixmap(
             hub.get(FileAccess).baseDir() + "/resources/einsicht-logo-v1.512.png"
         )))
+        
+        def presentSelf():
+            self.activateWindow()
+            self.setFocus()
+        hub.on(MessageBroker.presentSelf, presentSelf)
+        
+        def onTextChanged():
+            self.updateTitle()
+            self._updateDimensions()
+        hub.on(TextField.onTextChanged, onTextChanged)
         
         self.lineNumbers = LineNumbers(self, hub)
         self.textField = TextField(self, hub)
@@ -71,17 +83,6 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         self._initMenu()
         
-        def presentSelf():
-            self.activateWindow()
-            self.setFocus()
-        hub.on(MessageBroker.presentSelf, presentSelf)
-        
-        def onTextChanged():
-            self.updateTitle()
-            self._updateDimensions()
-            self.app.onFileContentChanged()
-        self.hub.on(TextField.onTextChanged)
-        
         
     def onFileClosed(self):
         self.setWindowTitle("[No file] - Einsicht")
@@ -96,7 +97,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     
         file = self.hub.get(FileAccess)
         filePath = file.filePath()
-    
+        Log.debug("file.isModified(): " + str(file.isModified()))
         if filePath == None:
             self.setWindowTitle("[No file]")
         elif file.isModified():
@@ -120,15 +121,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.setMinimumHeight(0)
         self.setMaximumWidth(16777215)
         self.setMaximumHeight(16777215)
-        
-    def onStoppedTyping(self):
-        if isinstance(self.app.highlighter, LanguageFromSyntaxTreeHighlighter):
-            self.app.highlighter.updateSyntaxTree(self.app.syntaxTree)
-        
-    def onNewSyntaxTree(self):
-        if isinstance(self.app.highlighter, LanguageFromSyntaxTreeHighlighter):
-            self.app.highlighter.updateSyntaxTree(self.app.syntaxTree)
-                
+              
     def applyAutocompleOffer(self, offer):
         offer.applyToTextField(self.textField)
         
@@ -142,8 +135,10 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self._autocompleteWidget.changeAutocomplete(autocompletion)
             
     def _updateDimensions(self):
-        contentWidth = self.textField.contentWidth()
-        contentHeight = self.textField.contentHeight()
+        textField = self.hub.get(TextField)
+    
+        contentWidth = textField.contentWidth()
+        contentHeight = textField.contentHeight()
         
         contentWidth = min(contentWidth, 800)
         contentHeight = min(contentHeight, 800)
@@ -164,6 +159,8 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             
         self.setMaximumWidth(contentWidth)
         self.setMaximumHeight(contentHeight)
+        
+        QTimer.singleShot(10, self.afterTextChanged)
 
     def onTextInserted(self, text, position, added):
         inserted = text[position:position+added]
@@ -180,10 +177,6 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
                indention = indentionMatch.group(1)
                self.textField.insertTextAt(position+added, indention)
                
-    def onSelectionChanged(self, position, anchor, text):
-        if self.app.highlighter != None:
-            self.app.highlighter.updateSelection(text)
-            
     def _toggleFileSearch(self):
         print("*_toggleFileSearch*")
         self.searchBar.toggle()

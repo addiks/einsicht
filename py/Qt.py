@@ -24,3 +24,4 @@ class SafeHandler:
 def connect_safely(event: SignalInstance, handler: Callable):
     SafeHandler(event, handler)
   
+   

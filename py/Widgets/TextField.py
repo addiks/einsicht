@@ -10,37 +10,27 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
     
     def __init__(self, parent: QtWidgets.QWidget, hub: Hub):
         QtWidgets.QPlainTextEdit.__init__(self, parent)
+        document = self.document()
         self.hub = hub
         self.hub.register(self)
+        self.hub.register(document)
         
         self.parent = parent
         self._selectionChangeCounter = 0
+        self._textChangeCounter = 0
+        self._fileContent = ""
         
         self.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
         
-        self.document().setDefaultFont(QtGui.QFont("Mono"))
-        
-        #self._completerItemModel = AutocompleteItemModel()
-        #self._completer = QtWidgets.QCompleter(self._completerItemModel)
-        # self.setCompleter(self._completer)
-        
-        #self._completer.setWidget(self)
-        
-        # self._completer.activated.connect(self.onCompletionActivated)
+        document.setDefaultFont(QtGui.QFont("Mono"))
         
         self.updateRequest.connect(self.onUpdateRequest)
         self.textChanged.connect(self.onTextChanged)
         self.selectionChanged.connect(self.onSelectionChanged)
         
-        self.document().contentsChange.connect(self.onContentChange)
+        document.contentsChange.connect(self.onContentChange)
+        QTimer.singleShot(10, lambda: self._onFileContentChanged(force=True))
         
-    def changeAutocomplete(self, autocomplete):
-        print("textField changeAutocomplete") 
-        #self._completerItemModel.changeAutocomplete(autocomplete)
-        
-    def onCompletionActivated(self, completion): # QString
-        pass
-
     def insertTextAt(self, position, text):
         cursor = QtGui.QTextCursor(self.document())
         cursor.setPosition(position, QtGui.QTextCursor.MoveAnchor)
@@ -140,8 +130,28 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
         self.parent.onUpdate(rect, dy)
         
     def onTextChanged(self):
-        self.hub.notify(self.onTextChanged)
+        self._onFileContentChanged(force = False)
 
+    def _onFileContentChanged(self, force: bool = False) -> None:
+        doc = self.document()
+        fileContent = doc.toPlainText()
+        
+        if fileContent == self._fileContent and not force:
+            return
+        
+        self._textChangeCounter += 1
+        
+        self._fileContent = fileContent
+        # self.window.onTextChanged()
+
+        currentTextChangeCounter = self._textChangeCounter
+        
+        QTimer.singleShot(10, self._onTextChanged)
+        QTimer.singleShot(250, lambda: self._checkStoppedTyping(currentTextChangeCounter))
+           
+    def _onTextChanged(self):
+        self.hub.notify(TextField.onTextChanged)
+           
     def onSelectionChanged(self):
         self._selectionChangeCounter += 1
         cursor = self.textCursor()
@@ -157,9 +167,16 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
             text
         ))
         
+    def _checkStoppedTyping(self, textChangeCounter: int) -> None:
+        if textChangeCounter == self._textChangeCounter:
+            self.onStoppedTyping()
+        
+    def onStoppedTyping(self) -> None:
+        self.hub.notify(TextField.onStoppedTyping)
+        
     def _checkSelectionChanged(self, selectionChangeCounter, position, anchor, text):
         if selectionChangeCounter == self._selectionChangeCounter:
-            self.parent.onSelectionChanged(position, anchor, text)
+            self.hub.notify(TextField.onSelectionChanged, text)
 
     def onContentChange(self, position, removed, added):
         # print([position, removed, added])

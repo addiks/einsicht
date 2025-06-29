@@ -43,6 +43,10 @@ class Hub:
             self._listeners[event].append(handler)
             if self.has(event) and event != object:
                 self._callListener(event, handler, ())
+                
+    @staticmethod
+    def listen(*args):
+        Log.debug("2 *args: " + str(*args))
         
     def notify(self, event: type, *args) -> None:
         if not isinstance(event, type) and not isinstance(event, Callable):
@@ -51,6 +55,14 @@ class Hub:
         if event in self._listeners:
             for listener in self._listeners[event]:
                 self._callListener(event, listener, *args)
+                
+    def setup(self, object):
+        self.register(object)
+        for key in dir(object):
+            function = getattr(object, key)
+            if isinstance(function, Callable) and hasattr(function, "hub__on_events"):
+                for event in function.hub__on_events:
+                    self.on(event, function)
                 
     def _callListener(self, event: type, listener: Callable, *args):
         try:
@@ -61,6 +73,14 @@ class Hub:
             Log.error("Exception while notifying " + str(listener) + " about " + str(event))
             Log.error(exception)
             Log.error(traceback.format_exc())
+        
+def on(event):
+    def decorator(function, *args):
+        if not hasattr(function, "hub__on_events"):
+            function.hub__on_events = []
+        function.hub__on_events.append(event)
+        return function
+    return decorator
         
 class Log:
     _logger: Logger = None
@@ -127,4 +147,3 @@ class SafeHandler:
 def connect_safely(event: SignalInstance, handler: Callable):
     SafeHandler(event, handler)
   
-   

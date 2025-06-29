@@ -25,7 +25,7 @@ from py.Versioning.VersioningSelector import VersioningSelector
 from py.ProjectIndex import ProjectIndex
 from py.Autocomplete.Autocompletion import Autocompletion
 from py.Qt import connect_safely
-from py.Hub import Log, Hub
+from py.Hub import Log, Hub, on
 from py.Api import FileAccess
 from py.MessageBroker import MessageBroker
 
@@ -35,21 +35,11 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         super(EditorWindow, self).__init__() 
         self.hub = hub
         
-        hub.register(self)
+        hub.setup(self)
         
         self.setWindowIcon(QtGui.QIcon(QtGui.QPixmap(
             hub.get(FileAccess).baseDir() + "/resources/einsicht-logo-v1.512.png"
         )))
-        
-        def presentSelf():
-            self.activateWindow()
-            self.setFocus()
-        hub.on(MessageBroker.presentSelf, presentSelf)
-        
-        def onTextChanged():
-            self.updateTitle()
-            self._updateDimensions()
-        hub.on(TextField.onTextChanged, onTextChanged)
         
         self.lineNumbers = LineNumbers(self, hub)
         self.textField = TextField(self, hub)
@@ -73,7 +63,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         hbox.addWidget(self.lineNumbers, 0)
         hbox.addWidget(self.textField, 0)
         
-        self.searchBar = SearchBar(self);
+        self.searchBar = SearchBar(hub);
         searchBarLayout = QtWidgets.QHBoxLayout(self.searchBar)
         
         vbox.addWidget(self.searchBar)
@@ -83,11 +73,21 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         self._initMenu()
         
+    @on(TextField.onTextChanged)
+    def _onTextChanged(self):
+        self.updateTitle()
+        self._updateDimensions()
         
+    @on(FileAccess.closeFile)
     def onFileClosed(self):
         self.setWindowTitle("[No file] - Einsicht")
         self.highlighter = None
         
+    @on(MessageBroker.presentSelf)
+    def presentSelf():
+        self.activateWindow()
+        self.setFocus()
+    
     def onFileOpened(self):
         self.updateTitle()
         document = self.textField.document()
@@ -180,9 +180,6 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
     def _toggleFileSearch(self):
         print("*_toggleFileSearch*")
         self.searchBar.toggle()
-        
-    def updateInlineSearchResults(self, occurences):
-        pass
         
     def _initMenu(self):
         

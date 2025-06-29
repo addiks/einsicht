@@ -11,7 +11,8 @@ from .ASTPatterns import NodePattern
 from .Tokens import Token, TokenMatcher, TokenDef
 
 from py.Widgets.TextField import TextField
-from py.Hub import Hub, Log
+from py.Widgets.SearchBar import InFileSearchResult
+from py.Hub import Hub, Log, on
 
 class Language: # abstract
 
@@ -371,14 +372,15 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
     
     def __init__(self, hub, document, syntaxTree, language):
         super().__init__(document)
+        hub.setup(self)
         self.hub = hub
         self.syntaxTree = syntaxTree
         self.language = language
         self._selection = ""
-        self.hub.on(ASTRoot, self.updateSyntaxTree)
-        self.hub.on(TextField.onSelectionChanged, self.updateSelection)
+        self._searchOccurencesByLine = {}
         self._reIndexTree()
 
+    @on(ASTRoot)
     def updateSyntaxTree(self, syntaxTree = None):
         if syntaxTree == None and self.hub.has(ASTRoot):
             syntaxTree = self.hub.get(ASTRoot)
@@ -387,11 +389,31 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
             self._reIndexTree()
             self.rehighlight()
             
+    @on(TextField.onSelectionChanged)
     def updateSelection(self, selection):
         if self._selection != selection:
             self._selection = selection
             self.rehighlight()
 
+    @on(InFileSearchResult)
+    def updateInlineSearchResults(self):
+        result = self.hub.get(InFileSearchResult)
+        Log.debug("New search results! " + str(len(result.occurences)))
+        
+        linesToUpdate = list(self._searchOccurencesByLine.keys())
+        
+        self._searchOccurencesByLine = {}
+        for entry in result.occurences:
+            if entry.line not in self._searchOccurencesByLine:
+                self._searchOccurencesByLine[entry.line] = []
+            self._searchOccurencesByLine[entry.line].append(entry)
+            linesToUpdate.append(entry.line)
+            
+        document = self.document()
+        for line in set(linesToUpdate):
+            Log.debug("rehighlightBlock " + str(line))
+            self.rehighlightBlock(document.findBlockByLineNumber(line - 1))
+        
     def highlightBlock(self, text):
         block = self.currentBlock()
         line = block.firstLineNumber() + 1
@@ -414,6 +436,13 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
                     offset = pos + len(self._selection)
                 else:
                     break
+                    
+        if line in self._searchOccurencesByLine:
+            format = QTextCharFormat()
+            format.setBackground(Qt.magenta)
+            for occurence in self._searchOccurencesByLine[line]:
+                Log.debug("setFormat L" + str(line) + ":" + str(occurence.column))
+                self.setFormat(occurence.column, len(occurence.text), format)
 
     def _reIndexTree(self):
         self._nodesByLine = {}

@@ -3,8 +3,9 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import QTimer
 
 from py.Autocomplete.AutocompleteItemModel import AutocompleteItemModel
-from py.Hub import Hub
+from py.Hub import Hub, Log, on
 from py.Api import TextField as TextFieldApi
+from py.Widgets.SearchBar import InFileSearchOccurence
 
 class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
     
@@ -12,7 +13,7 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
         QtWidgets.QPlainTextEdit.__init__(self, parent)
         document = self.document()
         self.hub = hub
-        self.hub.register(self)
+        self.hub.setup(self)
         self.hub.register(document)
         
         self.parent = parent
@@ -128,6 +129,23 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
     def onUpdateRequest(self, rect, dy):
         # print([rect, dy])
         self.parent.onUpdate(rect, dy)
+        
+    @on(InFileSearchOccurence)
+    def onInFileSearchChanged(self):
+        occurence = self.hub.get(InFileSearchOccurence)
+        self.scrollToLine(occurence.line)
+        
+    def scrollToLine(self, line):
+        document = self.document()
+        block = document.findBlockByLineNumber(line - 1)
+        if not block.isValid():
+            return
+            
+        cursor = QtGui.QTextCursor(document)
+        cursor.setPosition(block.position())
+        self.setTextCursor(cursor)
+        self.centerCursor()
+        
         
     def onTextChanged(self):
         self._onFileContentChanged(force = False)

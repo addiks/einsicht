@@ -19,7 +19,7 @@ from py.Languages.Language import Language
 from py.Languages.Language import FileContext
 from py.Autocomplete.Autocompletion import Autocompletion
 from py.Widgets.TextField import TextField
-from py.Hub import Hub, Log
+from py.Hub import Hub, Log, on
 from py.Api import FileAccess
 
 class Application(QtWidgets.QApplication, FileAccess):
@@ -53,7 +53,7 @@ class Application(QtWidgets.QApplication, FileAccess):
         self.setDesktopFileName("einsicht")
         
         self.hub = Hub()
-        self.hub.register(self)
+        self.hub.setup(self)
         
         self._textChangeCounter = 0
         
@@ -62,7 +62,6 @@ class Application(QtWidgets.QApplication, FileAccess):
         self.messageBroker = None
         self._versioningSelector = VersioningSelector(self.hub)
         
-        self.hub.on(TextField.onStoppedTyping, self._checkAutocompleteTrigger)
         self.hub.on(self.hub.get(QtGui.QTextDocument).contentsChange, self._onDocumentContentsChanged)
         QTimer.singleShot(10, lambda: self._onFileContentChanged(force=True))
         
@@ -102,7 +101,7 @@ class Application(QtWidgets.QApplication, FileAccess):
                 
     def closeFile(self) -> None:
         self._reset()
-        self.window.onFileClosed()
+        self.hub.notify(FileAccess.closeFile)
         self.info("Closed file")
         
     def openFile(self, filePath: str) -> None:
@@ -200,6 +199,7 @@ class Application(QtWidgets.QApplication, FileAccess):
             )
             self.hub.register(self.syntaxTree)
                
+    @on(TextField.onStoppedTyping)
     def _checkAutocompleteTrigger(self) -> None:
         if self.tokens != None and self.projectIndex != None:
             cursorPosition = self.window.textField.textCursor().position()

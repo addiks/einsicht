@@ -17,7 +17,7 @@ class MessageBroker(QtCore.QObject):
         
         filePath = self.hub.get(FileAccess).filePath()	
         
-        self.serviceName = "de.addiks.qtedit.file_" + hashlib.md5(
+        self.serviceName = "de.addiks.einsicht.file_" + hashlib.md5(
             filePath.encode('UTF-8')
         ).hexdigest()
         
@@ -35,7 +35,7 @@ class MessageBroker(QtCore.QObject):
         
         self.sessionBus.registerObject(
             '/file', 
-            'local.py.qtedit.file', 
+            'local.py.einsicht.file', 
             self, 
             QtDBus.QDBusConnection.ExportAllSlots
         )

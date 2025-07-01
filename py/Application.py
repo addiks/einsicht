@@ -29,8 +29,12 @@ class Application(QtWidgets.QApplication, FileAccess):
     def main(argv: list[str]) -> int:
         try:
             app = Application.instance()
-            return app.run(argv)
+            app.run(argv)
+            return app.execQt()
             
+        except SystemExit:
+            sys.exit(0)
+        
         except FileAlreadyOpenOnOtherProcessException:
             return 0
     
@@ -78,10 +82,10 @@ class Application(QtWidgets.QApplication, FileAccess):
         self.highlighter = None
         Log.setPrefix(self.fileNameDescription())
             
-    def run(self, argv: list[str]) -> int:
+    def run(self, argv: list[str]) -> None:
         filePath = None
-        if len(sys.argv) > 1:
-            filePath = abspath(sys.argv[1])
+        if len(argv) > 1:
+            filePath = abspath(argv[1])
         
         if filePath != None:
             self.openFile(filePath)
@@ -93,6 +97,7 @@ class Application(QtWidgets.QApplication, FileAccess):
 
         self.window.show()
         
+    def execQt(self) -> int:
         exitCode = self.exec() # Qt execution loop
         
         Log.info("Qt exited with code " + str(exitCode))
@@ -106,7 +111,7 @@ class Application(QtWidgets.QApplication, FileAccess):
         
     def openFile(self, filePath: str) -> None:
         self._filePath = abspath(filePath)
-        
+        print(filePath)
         Log.setPrefix(self.fileNameDescription() + ' - ')
         self.messageBroker = MessageBroker(self, self.hub)
         document = self.hub.get(QtGui.QTextDocument)
@@ -190,7 +195,7 @@ class Application(QtWidgets.QApplication, FileAccess):
         self._reparseFile()
             
     def _reparseFile(self) -> None:
-        if self.hub.has(Language) != None:
+        if self.hub.has(Language):
             (self.syntaxTree, self.tokens) = self.hub.get(Language).parse(
                 self._fileContent, 
                 self._filePath,
@@ -217,15 +222,21 @@ class Application(QtWidgets.QApplication, FileAccess):
             self.window.changeAutocomplete(autocompletion)
             
     def showOpenFilePicker(self):
+        folderPath = None
+        if self._filePath != None:
+            folderPath = dirname(self._filePath)
         (filePath, fileTypeDescr) = QtWidgets.QFileDialog.getOpenFileName(
             self.window, 
             "Open File", 
-            dirname(self._filePath),
+            folderPath,
             "Text files (*.*)"
         )
         
-        bashScript = self._bashScript()
-        os.system(f"nohup {bashScript} '{filePath}' > {bashScript}.log 2>&1 &")
+        if self._filePath == None:
+            self.openFile(filePath)
+        else:
+            bashScript = self._bashScript()
+            os.system(f"nohup {bashScript} '{filePath}' > {bashScript}.log 2>&1 &")
         
     def newFile(self) -> None:
         bashScript = self._bashScript()

@@ -64,7 +64,6 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         hbox.addWidget(self.textField, 0)
         
         self.searchBar = SearchBar(hub);
-        searchBarLayout = QtWidgets.QHBoxLayout(self.searchBar)
         
         vbox.addWidget(self.searchBar)
         vbox.addWidget(hboxWidget)

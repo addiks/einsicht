@@ -13,8 +13,8 @@ class SearchBar(QtWidgets.QWidget):
         self.hub = hub
         self._results = []
         
-        hbox = QtWidgets.QHBoxLayout(self)
-        self.layout = hbox
+        hbox = QtWidgets.QHBoxLayout()
+        self.setLayout(hbox)
         hbox.setSpacing(0)
         hbox.setContentsMargins(0, 0, 0, 0)
          

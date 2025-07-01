@@ -1,3 +1,4 @@
 /env
+/test/behaviour/var/*
 *.log
 __pycache__

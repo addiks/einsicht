@@ -35,7 +35,7 @@ journalctl -f SYSLOG_IDENTIFIER=einsicht
 * Line-Numbers
 * Syntax-Highlighting
 * Highlighting of selected words
-* AST-Parsing for implemented languages (see below)
+* AST-Parsing & Project-Indexing / -Autocompletion for implemented languages (see below)
 
 Planned **Common** Features:
 * Git Integration
@@ -44,7 +44,6 @@ Planned **Common** Features:
 * Search & Replace
 
 Planned **Uncommon** (for text-editors) Features:
-* Project-Indexing / -Autocompletion (Abstracted per Language)
 * Step-Debugger implementation 
   (Abstracted per Protocol. f.e.: dbgp/X-Debug for PHP)
 * Edit in multiple places at once (Multi-Cursor)

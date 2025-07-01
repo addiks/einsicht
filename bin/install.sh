@@ -4,6 +4,27 @@ set -e
 set -x
 
 BASEDIR="` dirname $( dirname $( realpath $0 ) ) `"
+
+(
+    set -e
+    set -x
+    
+    cd $BASEDIR
+    
+    ENV_DIR="$BASEDIR/env"
+    if [ ! -d "$ENV_DIR" ]; then
+        python3 -m venv "$ENV_DIR"
+    fi
+
+    ENV_BIN="$ENV_DIR/bin"
+    PYTHON="$ENV_BIN/python3"
+    PIP="$ENV_BIN/pip3"
+    
+    source "$ENV_BIN/activate"
+    
+    $PYTHON $PIP install systemd systemd-python robotframework
+)
+
 DESKTOP_DIR="$HOME/.local/share/applications"
 ICON_DIR="$HOME/.local/share/icons/hicolor"
 BIN_DIR="$HOME/.local/bin"
@@ -21,15 +42,5 @@ ln -sf "$BASEDIR/resources/einsicht-logo-v1.512.png" "$ICON_DIR/512x512/apps/ein
 chmod +x "$BIN_DIR/1s"
 
 update-desktop-database "$HOME/.local/share/applications"
-
-(
-    ENV_BIN="$BASEDIR/env/bin"
-    PYTHON="$ENV_BIN/python3"
-    PIP="$ENV_BIN/pip3"
-    
-    source "$ENV_BIN/activate"
-    
-    $PYTHON $PIP install systemd systemd-python
-)
 
 

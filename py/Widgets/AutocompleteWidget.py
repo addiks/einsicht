@@ -3,9 +3,12 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 import os
 
+from py.Hub import Hub
+
 class AutocompleteWidget(QtWidgets.QListWidget):
-    def __init__(self, editorWindow, autocompletion):
+    def __init__(self, editorWindow, hub: Hub, autocompletion):
         super().__init__(editorWindow.textField)
+        hub.setup(self)
         
         self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         # self.setFixedSize(100, 100)
@@ -21,8 +24,8 @@ class AutocompleteWidget(QtWidgets.QListWidget):
         self.changeAutocomplete(autocompletion)
         
     def onItemActivated(self, item):
+        hub.registry(item.offer)
         self.hide()
-        print(item)
         self.editorWindow.applyAutocompleOffer(item.offer)
         
     def changeAutocomplete(self, autocompletion):

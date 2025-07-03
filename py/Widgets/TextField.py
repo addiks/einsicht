@@ -24,6 +24,7 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
         self.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
         
         document.setDefaultFont(QtGui.QFont("Mono"))
+#        document.setPlainText("\n")
         
         self.updateRequest.connect(self.onUpdateRequest)
         self.textChanged.connect(self.onTextChanged)

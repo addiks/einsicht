@@ -6,6 +6,8 @@ import os
 
 from py.Hub import Log
 from py.Application import Application
+from py.Widgets.AutocompleteWidget import AutocompleteWidget
+from py.Widgets.SearchBar import SearchBar
 
 class BackDoor(QtCore.QObject):
     def __init__(self, parent: QtCore.QObject, hub: Hub):
@@ -34,3 +36,10 @@ class BackDoor(QtCore.QObject):
         Log.debug("Inject call to get(Application).exit()")
         return self.hub.get(Application).exit()
         
+    @Slot(result=bool)
+    def isAutocompleteOpen(self) -> bool:
+        return self.hub.get(AutocompleteWidget).isVisible()
+        
+    @Slot(result=bool)
+    def isSearchBarOpen(self) -> bool:
+        return self.hub.get(SearchBar).isVisible()

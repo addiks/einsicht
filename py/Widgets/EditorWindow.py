@@ -23,7 +23,7 @@ from py.Languages.AbstractSyntaxTree import ASTRoot
 from py.Versioning import Versioning
 from py.Versioning.VersioningSelector import VersioningSelector
 from py.ProjectIndex import ProjectIndex
-from py.Autocomplete.Autocompletion import Autocompletion
+from py.Autocomplete.Autocompletion import Autocompletion, AutocompletionOffer
 from py.Qt import connect_safely
 from py.Hub import Log, Hub, on
 from py.Api import FileAccess
@@ -47,7 +47,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         
         self.highlighter = None
         self.messageBroker = None
-        self._autocompleteWidget = AutocompleteWidget(self, None)
+        self._autocompleteWidget = AutocompleteWidget(self, hub, None)
         
         self.centralWidget = QtWidgets.QWidget()
 
@@ -121,8 +121,9 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.setMaximumWidth(16777215)
         self.setMaximumHeight(16777215)
               
+    @on(AutocompletionOffer)
     def applyAutocompleOffer(self, offer):
-        offer.applyToTextField(self.textField)
+        self.hub.get(AutocompletionOffer).applyToTextField(self.textField)
         
     def isAutocompleteVisible(self):
         return self._autocompleteWidget.isVisible()

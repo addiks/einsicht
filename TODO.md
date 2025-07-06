@@ -1,0 +1,1 @@
+* Edit files over Network ("ssh://", "sftp://", "ftp://", ...)

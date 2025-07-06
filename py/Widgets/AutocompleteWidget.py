@@ -8,6 +8,7 @@ from py.Hub import Hub
 class AutocompleteWidget(QtWidgets.QListWidget):
     def __init__(self, editorWindow, hub: Hub, autocompletion):
         super().__init__(editorWindow.textField)
+        self.hide()
         hub.setup(self)
         
         self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)

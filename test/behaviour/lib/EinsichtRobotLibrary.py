@@ -37,16 +37,17 @@ class EinsichtRobotLibrary:
         self._subprocess.terminate()
         
     def ensure_autocomplete_is_closed(self):
-        assert self.interface.call('isAutocompleteOpen') == False, "Autocomplete widget is open, should be closed!"
+        assert self._callBool('isAutocompleteOpen') == False, "Autocomplete widget is open, should be closed!"
         
     def ensure_autocomplete_is_open(self):
-        assert self.interface.call('isAutocompleteOpen') == True, "Autocomplete widget is closed, should be open!"
+        console(str(self.interface.call('isAutocompleteOpen').arguments()))
+        assert self._callBool('isAutocompleteOpen') == True, "Autocomplete widget is closed, should be open!"
         
     def ensure_search_bar_is_closed(self):
-        assert self.interface.call('isSearchBarOpen') == False, "Search bar is open, should be closed!"
+        assert self._callBool('isSearchBarOpen') == False, "Search bar is open, should be closed!"
         
     def ensure_search_bar_is_open(self):
-        assert self.interface.call('isSearchBarOpen') == True, "Search bar is closed, should be open!"
+        assert self._callBool('isSearchBarOpen') == True, "Search bar is closed, should be open!"
         
     def _start1SProcess(self, args: list) -> subprocess.Popen:
         testBaseDir = dirname(dirname(abspath(__file__)))
@@ -61,3 +62,5 @@ class EinsichtRobotLibrary:
             raise Exception("QDbus: " + interface.lastError().message())
         return interface
         
+    def _callBool(self, methodName) -> bool:
+        return self.interface.call('isSearchBarOpen').arguments()[0]

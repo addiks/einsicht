@@ -31,10 +31,18 @@ class BackDoor(QtCore.QObject):
             QtDBus.QDBusConnection.ExportAllSlots
         )
         
-    @Slot()
+    @Slot(result=bool)
+    def isReadyForInteraction(self) -> bool:
+        return self.hub.get(Application).isReadyForInteraction()
+        
+    @Slot(result=int)
     def exit(self) -> int:
         Log.debug("Inject call to get(Application).exit()")
         return self.hub.get(Application).exit()
+        
+    @Slot(str)
+    def saveFileTo(self, filePath) -> None:
+        self.hub.get(Application).saveFileAs(filePath)
         
     @Slot(result=bool)
     def isAutocompleteOpen(self) -> bool:
@@ -43,3 +51,14 @@ class BackDoor(QtCore.QObject):
     @Slot(result=bool)
     def isSearchBarOpen(self) -> bool:
         return self.hub.get(SearchBar).isVisible()
+        
+    @Slot(str)
+    def writeText(self, text) -> None:
+        document = self.hub.get(QtGui.QTextDocument)
+        cursor = QtGui.QTextCursor(document)
+        cursor.insertText(text)
+        
+    @Slot(result=str)
+    def getText(self) -> bool:
+        return self.hub.get(QtGui.QTextDocument).toPlainText()
+        

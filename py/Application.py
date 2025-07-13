@@ -52,6 +52,7 @@ class Application(QtWidgets.QApplication, FileAccess):
         return Application._instance
         
     def __init__(self):
+        self._isReadyForInteraction = False
         super().__init__([])
         self.setApplicationDisplayName("Einsicht - 1s")
         self.setDesktopFileName("einsicht")
@@ -96,6 +97,10 @@ class Application(QtWidgets.QApplication, FileAccess):
             Log.info("Opened empty file")
 
         self.window.show()
+        self._isReadyForInteraction = True
+        
+    def isReadyForInteraction(self) -> bool:
+        return self._isReadyForInteraction
         
     def execQt(self) -> int:
         exitCode = self.exec() # Qt execution loop
@@ -106,6 +111,8 @@ class Application(QtWidgets.QApplication, FileAccess):
                 
     def closeFile(self) -> None:
         self._reset()
+        if self.messageBroker != None:
+            self.messageBroker.close()
         self.hub.notify(FileAccess.closeFile)
         self.info("Closed file")
         
@@ -156,6 +163,24 @@ class Application(QtWidgets.QApplication, FileAccess):
         except:
             Log.error("While saving file: %s" % Log.normalize(sys.exc_info()[1]))
             raise
+            
+    def saveFileAs(self, filePath=None) -> None:
+        folderPath = None
+        if self._filePath != None:
+            folderPath = dirname(self._filePath)
+        (filePath, fileTypeDescr) = QtWidgets.QFileDialog.getSaveFileName(
+            self.window, 
+            "Save File As", 
+            folderPath,
+            "Text files (*.*)"
+        )
+        if len(filePath) <= 0 or filePath == self._filePath:
+            return
+        if self.messageBroker != None:
+            self.messageBroker.close()
+        self._filePath = filePath
+        self.messageBroker = MessageBroker(self, self.hub)
+        self.saveFile()
             
     def _updateProjectIndex(self) -> None:
         if self.syntaxTree != None and self.projectIndex != None:
@@ -231,7 +256,8 @@ class Application(QtWidgets.QApplication, FileAccess):
             folderPath,
             "Text files (*.*)"
         )
-        
+        if len(filePath) <= 0:
+            return
         if self._filePath == None:
             self.openFile(filePath)
         else:

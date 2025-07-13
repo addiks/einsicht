@@ -206,6 +206,11 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         saveAction.setStatusTip('Save')
         connect_safely(saveAction.triggered, fileHandler.saveFile)
         
+        saveAsAction = fileMenu.addAction('Save As')
+        saveAsAction.setShortcut('Ctrl+Shift+S')
+        saveAsAction.setStatusTip('Save')
+        connect_safely(saveAsAction.triggered, fileHandler.saveFileAs)
+        
         quitAction = fileMenu.addAction('Quit')
         quitAction.setShortcut('Ctrl+Q')
         quitAction.setStatusTip('Quit')

@@ -1,6 +1,6 @@
 
 import sys, os, logging, threading, time, subprocess
-from os.path import dirname, abspath
+from os.path import dirname, abspath, isfile
 from robot.api import logger
 
 sys.path.append(dirname(dirname(dirname(dirname(abspath(__file__))))))
@@ -20,6 +20,7 @@ class EinsichtRobotLibrary:
     ROBOT_LIBRARY_SCOPE = 'SUITE'
 
     def __init__(self) -> None:
+        self.varDir = dirname(dirname(abspath(__file__))) + "/var"
         self.interface = None
         self.serviceName = None
         self.sessionBus = QtDBus.QDBusConnection.sessionBus()
@@ -31,10 +32,21 @@ class EinsichtRobotLibrary:
     def create_a_new_file(self):
         self._start1SProcess([])
         self.interface = self._connectToBackdoor()
+        while not self._callBool('isReadyForInteraction'):
+            time.sleep(0.01)
         
     def close_the_file(self):
         self.interface.call('exit')
         self._subprocess.terminate()
+        
+    def save_file_to(self, filePath):
+        self.interface.call('saveFileTo')
+        
+    def ensure_file_exists(self, filePath):
+        assert isfile(self.varDir + filePath), "File '" + filePath + "' should exist!"
+        
+    def ensure_file_contains(self, filePath, expectedContents):
+        pass
         
     def ensure_autocomplete_is_closed(self):
         assert self._callBool('isAutocompleteOpen') == False, "Autocomplete widget is open, should be closed!"
@@ -48,19 +60,37 @@ class EinsichtRobotLibrary:
         
     def ensure_search_bar_is_open(self):
         assert self._callBool('isSearchBarOpen') == True, "Search bar is closed, should be open!"
+    
+    def write_text(self, text) -> None:
+        self.interface.call("writeText", text)
+        
+    def ensure_text_does_not_contain(self, needle) -> None:
+        assert needle not in self._callStr('getText'), "Text does contain '" + needle + "' but it should not!"
+        
+    def ensure_text_contains(self, needle) -> None:
+        assert needle in self._callStr('getText'), "Text does not contain '" + needle + "' but it should!"
+        
+    ### Private
         
     def _start1SProcess(self, args: list) -> subprocess.Popen:
         testBaseDir = dirname(dirname(abspath(__file__)))
         baseDir = dirname(dirname(testBaseDir))
         self._subprocess = subprocess.Popen([baseDir + "/env/bin/python3", testBaseDir + "/bin/1s.backdoored.py"] + args)
-        time.sleep(0.5)
+        # stime.sleep(0.3)
         
     def _connectToBackdoor(self) -> QtDBus.QDBusInterface:
         self._serviceName = "de.addiks.einsicht.test_" + str(self._subprocess.pid)
-        interface = QtDBus.QDBusInterface(self._serviceName, '/backdoor', '', self.sessionBus)
+        while True:
+            time.sleep(0.01)
+            interface = QtDBus.QDBusInterface(self._serviceName, '/backdoor', '', self.sessionBus)
+            if "was not provided by any .service files" not in interface.lastError().message():
+                break
         if interface.lastError().isValid():
             raise Exception("QDbus: " + interface.lastError().message())
         return interface
         
     def _callBool(self, methodName) -> bool:
-        return self.interface.call('isSearchBarOpen').arguments()[0]
+        return self.interface.call(methodName).arguments()[0]
+        
+    def _callStr(self, methodName) -> str:
+        return self.interface.call(methodName).arguments()[0]

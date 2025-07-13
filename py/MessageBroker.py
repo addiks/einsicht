@@ -40,6 +40,10 @@ class MessageBroker(QtCore.QObject):
             QtDBus.QDBusConnection.ExportAllSlots
         )
         
+    def close(self):
+        self.sessionBus.unregisterObject('/file')
+        self.sessionBus.unregisterService(self.serviceName)
+        
     @Slot(str, result=str)
     def test(self, arg: str) -> str:
         return "foo " + arg

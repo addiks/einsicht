@@ -29,6 +29,7 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
         self.updateRequest.connect(self.onUpdateRequest)
         self.textChanged.connect(self.onTextChanged)
         self.selectionChanged.connect(self.onSelectionChanged)
+        self.cursorPositionChanged.connect(self.onCursorPositionChanged)
         
         document.contentsChange.connect(self.onContentChange)
         QTimer.singleShot(10, lambda: self._onFileContentChanged(force=True))
@@ -147,7 +148,9 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
         self.setTextCursor(cursor)
         self.centerCursor()
         
-        
+    def onCursorPositionChanged(self):
+        self.hub.notify(TextFieldApi.onCursorPositionChanged)
+    
     def onTextChanged(self):
         self._onFileContentChanged(force = False)
 
@@ -169,7 +172,7 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
         QTimer.singleShot(250, lambda: self._checkStoppedTyping(currentTextChangeCounter))
            
     def _onTextChanged(self):
-        self.hub.notify(TextField.onTextChanged)
+        self.hub.notify(TextFieldApi.onTextChanged)
            
     def onSelectionChanged(self):
         self._selectionChangeCounter += 1
@@ -191,11 +194,11 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
             self.onStoppedTyping()
         
     def onStoppedTyping(self) -> None:
-        self.hub.notify(TextField.onStoppedTyping)
+        self.hub.notify(TextFieldApi.onStoppedTyping)
         
     def _checkSelectionChanged(self, selectionChangeCounter, position, anchor, text):
         if selectionChangeCounter == self._selectionChangeCounter:
-            self.hub.notify(TextField.onSelectionChanged, text)
+            self.hub.notify(TextFieldApi.onSelectionChanged, text)
 
     def onContentChange(self, position, removed, added):
         # print([position, removed, added])

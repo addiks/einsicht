@@ -71,7 +71,7 @@ class Hub:
         except:
             exception = sys.exc_info()[0]
             Log.error("Exception while notifying " + str(listener) + " about " + str(event))
-            Log.error(exception)
+            # Log.error(exception)
             Log.error(traceback.format_exc())
         
 def on(event):

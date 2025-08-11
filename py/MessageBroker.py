@@ -50,5 +50,5 @@ class MessageBroker(QtCore.QObject):
         
     @Slot()
     def presentSelf(self) -> None:
-        self.hub.notify(self.presentSelf)
+        self.hub.notify(MessageBroker.presentSelf)
         

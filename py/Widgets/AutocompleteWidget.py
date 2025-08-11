@@ -3,7 +3,8 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 import os
 
-from py.Hub import Hub
+from py.Hub import Hub, on
+from py.Api import TextField
 
 class AutocompleteWidget(QtWidgets.QListWidget):
     def __init__(self, editorWindow, hub: Hub, autocompletion):
@@ -16,13 +17,19 @@ class AutocompleteWidget(QtWidgets.QListWidget):
 
         self.itemActivated.connect(self.onItemActivated)
         
-        editorWindow.textField.textChanged.connect(self.hide)
-        editorWindow.textField.selectionChanged.connect(self.hide)
-        editorWindow.textField.cursorPositionChanged.connect(self.hide)
+        # editorWindow.textField.textChanged.connect(self.hide)
+        # editorWindow.textField.selectionChanged.connect(self.hide)
+        # editorWindow.textField.cursorPositionChanged.connect(self.hide)
         
         self.editorWindow = editorWindow
         self.autocompletion = None
         self.changeAutocomplete(autocompletion)
+        
+    @on(TextField.onTextChanged)
+    @on(TextField.onSelectionChanged)
+    @on(TextField.onCursorPositionChanged)
+    def hide(self, foo=None):
+        super().hide()
         
     def onItemActivated(self, item):
         hub.registry(item.offer)

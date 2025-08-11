@@ -18,9 +18,8 @@ from py.ProjectIndex import ProjectIndex
 from py.Languages.Language import Language
 from py.Languages.Language import FileContext
 from py.Autocomplete.Autocompletion import Autocompletion
-from py.Widgets.TextField import TextField
 from py.Hub import Hub, Log, on
-from py.Api import FileAccess
+from py.Api import FileAccess, TextField
 
 class Application(QtWidgets.QApplication, FileAccess):
     _instance = None
@@ -149,6 +148,7 @@ class Application(QtWidgets.QApplication, FileAccess):
         document.setPlainText(self._fileContent)
         
         self.window.onFileOpened()
+        self.hub.notify(FileAccess.openFile)
         
     def saveFile(self) -> None:
         try:
@@ -168,12 +168,13 @@ class Application(QtWidgets.QApplication, FileAccess):
         folderPath = None
         if self._filePath != None:
             folderPath = dirname(self._filePath)
-        (filePath, fileTypeDescr) = QtWidgets.QFileDialog.getSaveFileName(
-            self.window, 
-            "Save File As", 
-            folderPath,
-            "Text files (*.*)"
-        )
+        if filePath == None:
+            (filePath, fileTypeDescr) = QtWidgets.QFileDialog.getSaveFileName(
+                self.window, 
+                "Save File As", 
+                folderPath,
+                "Text files (*.*)"
+            )
         if len(filePath) <= 0 or filePath == self._filePath:
             return
         if self.messageBroker != None:

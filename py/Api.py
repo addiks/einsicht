@@ -36,4 +36,42 @@ class FileAccess:
         raise NotImplementedError
 
 class TextField:
-    pass
+    def document(self):
+        raise NotImplementedError
+        
+    def insertTextAt(self, position, text):
+        raise NotImplementedError
+        
+    def removeTextAt(self, position, length):
+        raise NotImplementedError
+        
+    def indentIn(self):
+        raise NotImplementedError
+    
+    def indentOut(self):
+        raise NotImplementedError
+    
+    def deleteCurrentLines(self):
+        raise NotImplementedError
+    
+    def scrollToLine(self, line):
+        raise NotImplementedError
+    
+    def contentWidth(self):
+        raise NotImplementedError
+    
+    def contentHeight(self):
+        raise NotImplementedError
+        
+    def onSelectionChanged(self):
+        raise NotImplementedError
+        
+    def onStoppedTyping(self) -> None:
+        raise NotImplementedError
+        
+    def onTextChanged(self):
+        raise NotImplementedError
+        
+    def onCursorPositionChanged(self):
+        raise NotImplementedError
+    

@@ -1,0 +1,24 @@
+
+ Tokens => [Selektierung] => AST-Widgets
+ 
+ z.B.
+    - ASTNumberWidget
+    - ASTLiteralWidget
+    - ASTKeywordWidget
+    - ASTBracketWidget
+    - ...
+    
+AST-Widgets haben Regeln um sich - basierend auf Inserts/Removes - in andere AST-Widgets umzuwandeln
+Umwandlungen halten den Zugrunde liegenden AST-Baum up to date.
+Der Dateiinhalt wird nicht separat gespeichert.
+Bei Datei-Speicher-Operation wird der Dateiinhalt aus dem AST rekonstruiert.
+
+Der Auswahl-Prozess von AST-Tokens zu AST-Widgets ist Language-Spezifisch,
+aber die Library von AST-Widgets ist vorgegeben, kann aber erweitert werden.
+
+
+
+ AST-/Grammar-Tree wie HTML-Tree behandeln und (Language-Abhängig) mit CSS dekorieren.
+ Dazu die Qt setStyleSheet Methode verwenden.
+ Metadaten (wie "deprecated Class") können als CSS-Klassen (z.B. ".deprecated") dargestellt werden,
+ während AST-Element-Namen die HTML-Element-Namen sind: "namespace > interface.deprecated { color: red; }"

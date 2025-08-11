@@ -1,0 +1,18 @@
+- Basics
+  - 001 Highlighting
+  - 002 Text Search
+- Versioning
+  - Open Gui
+  - Show Status
+  - Show Modified
+- Language Specific 
+  - Syntax Highlighting
+    - Python
+    - Markdown
+    - Java
+    - JSON
+    - Javascript
+    - Typescript
+    - PHP
+  - Autocomplete
+    - Python

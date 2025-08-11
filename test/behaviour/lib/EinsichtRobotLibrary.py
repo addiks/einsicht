@@ -40,14 +40,16 @@ class EinsichtRobotLibrary:
         self._subprocess.terminate()
         
     def save_file_to(self, filePath):
-        self.interface.call('saveFileTo')
+        self.interface.call('saveFileTo', self.varDir + filePath)
         
     def ensure_file_exists(self, filePath):
         assert isfile(self.varDir + filePath), "File '" + filePath + "' should exist!"
         
     def ensure_file_contains(self, filePath, expectedContents):
-        pass
-        
+        with open(self.varDir + filePath) as handle:
+            actualContents = handle.read()
+            assert expectedContents in actualContents, "File '" + filePath + "' should contain '" + expectedContents + "' but does not!"
+       
     def ensure_autocomplete_is_closed(self):
         assert self._callBool('isAutocompleteOpen') == False, "Autocomplete widget is open, should be closed!"
         

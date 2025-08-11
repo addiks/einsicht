@@ -5,6 +5,7 @@ from mimetypes import MimeTypes
 from py.Languages.PythonLanguage import PythonLanguage
 from py.Languages.PHPLanguage import PHPLanguage
 from py.Languages.MarkdownLanguage import MarkdownLanguage
+from py.Languages.UnknownLanguage import UnknownLanguage
 from py.Hub import Log, Hub
 
 class LanguageSelector:
@@ -23,6 +24,9 @@ class LanguageSelector:
         fileExtension = os.path.splitext(filePath)[-1]
         if fileExtension == ".md":
             language = MarkdownLanguage(self.hub)
+        
+        if language == None:
+            language = UnknownLanguage(self.hub)
         
         Log.debug("Selected " + str(type(language)) + " for " + filePath)
         

@@ -75,8 +75,11 @@ class Language: # abstract
             
             if self.debugEnabled():
                 dumpAST(nodes)
+                
+            ast = ASTRoot(nodes, filepath)
+            self.hub.register(ast)
             
-            self._parseCache[hash] = (ASTRoot(nodes, filepath), tokens)
+            self._parseCache[hash] = (ast, tokens)
         return self._parseCache[hash]
         
     def _applyGrammar(self, nodes, grammarMap):
@@ -372,18 +375,18 @@ class LanguageFromSyntaxTreeHighlighter(QSyntaxHighlighter):
     
     def __init__(self, hub, document, syntaxTree, language):
         super().__init__(document)
-        hub.setup(self)
         self.hub = hub
         self.syntaxTree = syntaxTree
         self.language = language
         self._selection = ""
         self._searchOccurencesByLine = {}
+        hub.setup(self)
         self._reIndexTree()
 
     @on(ASTRoot)
-    def updateSyntaxTree(self, syntaxTree = None):
-        if syntaxTree == None and self.hub.has(ASTRoot):
-            syntaxTree = self.hub.get(ASTRoot)
+    def updateSyntaxTree(self, a=None):
+        syntaxTree = self.hub.get(ASTRoot)
+        print(syntaxTree)
         if self.syntaxTree != syntaxTree:
             self.syntaxTree = syntaxTree
             self._reIndexTree()

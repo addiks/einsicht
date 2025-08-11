@@ -12,6 +12,8 @@ import logging
 from systemd.journal import JournalHandler
 
 from py.Widgets.TextField import TextField
+from py.Widgets.CairoTextField import CairoTextField
+from py.Widgets.ASTTextField import ASTTextField
 from py.Widgets.LineNumbers import LineNumbers
 from py.Widgets.AutocompleteWidget import AutocompleteWidget
 from py.Widgets.SearchBar import SearchBar
@@ -26,7 +28,7 @@ from py.ProjectIndex import ProjectIndex
 from py.Autocomplete.Autocompletion import Autocompletion, AutocompletionOffer
 from py.Qt import connect_safely
 from py.Hub import Log, Hub, on
-from py.Api import FileAccess
+from py.Api import FileAccess, TextField as TextFieldApi
 from py.MessageBroker import MessageBroker
 
 class EditorWindow(QtWidgets.QMainWindow): # QWidget
@@ -41,13 +43,11 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             hub.get(FileAccess).baseDir() + "/resources/einsicht-logo-v1.512.png"
         )))
         
-        self.lineNumbers = LineNumbers(self, hub)
-        self.textField = TextField(self, hub)
         self._textChangeCounter = 0
         
         self.highlighter = None
         self.messageBroker = None
-        self._autocompleteWidget = AutocompleteWidget(self, hub, None)
+        self._autocompleteWidget = None
         
         self.centralWidget = QtWidgets.QWidget()
 
@@ -55,6 +55,40 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         vbox.setSpacing(0)
         vbox.setContentsMargins(0, 0, 0, 0)
 
+        widgetType = None
+        if 'EINSICHT_WIDGET' in os.environ:
+            widgetType = os.environ['EINSICHT_WIDGET']
+        
+        if widgetType == 'AST':
+            self._applyASTLayout(vbox)
+        elif widgetType == 'CAIRO':
+            self._applyCairoLayout(vbox)
+        else:
+            # self._applyASTLayout(vbox)
+            self._applyQtPlainTextFieldLayout(vbox)
+
+        self.searchBar = SearchBar(hub);
+        vbox.addWidget(self.searchBar)
+        
+        self._autocompleteWidget = AutocompleteWidget(self, hub, None)
+        
+        self.centralWidget.layout = vbox
+        self.setCentralWidget(self.centralWidget)
+        
+        self._initMenu()
+        
+    def _applyCairoLayout(self, vbox):
+        self.textField = CairoTextField(self, self.hub)
+        vbox.addWidget(self.textField)
+        
+    def _applyASTLayout(self, vbox):
+        self.textField = ASTTextField(self, self.hub)
+        vbox.addWidget(self.textField)
+        
+    def _applyQtPlainTextFieldLayout(self, vbox):
+        self.lineNumbers = LineNumbers(self, self.hub)
+        self.textField = TextField(self, self.hub)
+            
         hboxWidget = QtWidgets.QWidget()
         hbox = QtWidgets.QHBoxLayout(hboxWidget)
         hboxWidget.layout = hbox
@@ -63,16 +97,10 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         hbox.addWidget(self.lineNumbers, 0)
         hbox.addWidget(self.textField, 0)
         
-        self.searchBar = SearchBar(hub);
-        
-        vbox.addWidget(self.searchBar)
         vbox.addWidget(hboxWidget)
-        self.centralWidget.layout = vbox
-        self.setCentralWidget(self.centralWidget)
         
-        self._initMenu()
         
-    @on(TextField.onTextChanged)
+    @on(TextFieldApi.onTextChanged)
     def _onTextChanged(self):
         self.updateTitle()
         self._updateDimensions()
@@ -83,7 +111,9 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self.highlighter = None
         
     @on(MessageBroker.presentSelf)
-    def presentSelf():
+    def presentSelf(self):
+        print("presentSelf()")
+        self.raise_()
         self.activateWindow()
         self.setFocus()
     
@@ -135,7 +165,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
         self._autocompleteWidget.changeAutocomplete(autocompletion)
             
     def _updateDimensions(self):
-        textField = self.hub.get(TextField)
+        textField = self.hub.get(TextFieldApi)
     
         contentWidth = textField.contentWidth()
         contentHeight = textField.contentHeight()

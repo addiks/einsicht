@@ -10,20 +10,21 @@ from py.Widgets.AST.ASTWidget import ASTWidget, ASTRowWidget, ASTRowWidgetContai
 from py.Widgets.AST.ASTWidget import ASTBranchWidget, ASTTokenWidget
 from py.Widgets.AST.ASTRootWidget import ASTRootWidget
 
-class ASTTextField(QtWidgets.QWidget, TextFieldApi, ASTRowWidgetContainer):
+class ASTTextField(QtWidgets.QScrollArea, TextFieldApi, ASTRowWidgetContainer):
     def __init__(
         self, 
         parent: QtWidgets.QWidget, 
         hub: Hub
     ):
-        QtWidgets.QWidget.__init__(self, parent)
+        QtWidgets.QScrollArea.__init__(self, parent)
         
+        self.parent = parent
         self._document = QtGui.QTextDocument(self)
         self.hub = hub
         self.hub.setup(self)
         self.hub.register(self._document)
         
-        self.setMinimumSize(QtCore.QSize(500, 500))
+        self.setMinimumSize(QtCore.QSize(100, 100))
         
         self._document.contentsChanged.connect(self.onDocumentContentsChanged)
         
@@ -32,51 +33,85 @@ class ASTTextField(QtWidgets.QWidget, TextFieldApi, ASTRowWidgetContainer):
         label = QtWidgets.QLabel()
         
         self.layout = QtWidgets.QVBoxLayout(self)
+        self.layout.setSpacing(0)
+        self.layout.setContentsMargins(0, 0, 0, 0)
         
     @on(ASTRoot)
     def onNewAST(self):
         self._processNewAst(self.hub.get(ASTRoot))
         
     def _processNewAst(self, root: ASTRoot):
-        print("QWEQWEQWE")
-        # ASTRootWidget(root)
-        
         self.rows = []
         self.rows.append(ASTRowWidget(self, 0))
         self.layout.addWidget(self.rows[0])
         
-        for node in root.children:
-            self._nodeToWidget(node, root, self, self.rows[0])
-    
-        self.show()
+        parentWidget = self.rows[0]
         
-#    def _nodesToWidget(
-#        self, 
-#        parent: ASTWidget, 
-#        nodes, 
-#        lastRow: ASTRowWidget
-#    ):
-#        for node in nodes:
-#            self._nodeToWidget(node, parent, self, lastRow)
+        i=0
+        for node in root.children:
+            parentWidget = self._nodeToWidget(node, root, parentWidget)
+            i+=1
+            if i > 200:
+                break
+        
+        self._addSpacerToLayout(parentWidget.layout)
+    
+        self._addSpacerToLayout(self.layout)
+    
+        minimumWidth = 100    
+        heightSum = 0
+        for row in self.rows:
+            rowSize = row.sizeHint()
+            heightSum += rowSize.height()
+            minimumWidth = max(100, min(1000, max(minimumWidth, rowSize.width())))
+            print(rowSize)
+            
+        self.setMinimumSize(
+            minimumWidth, 
+            max(100, min(1000, heightSum))
+        )
+        
+        self.parent.adjustSize()
+        self.parent.updateGeometry()
         
     def _nodeToWidget(
         self, 
         node: ASTNode,
         parentNode: ASTBranch,
-        parentWidget: QtWidgets.QWidget,
-        lastRow: ASTRowWidget
+        parentWidget: QtWidgets.QWidget
     ):
-        widget = None
         if isinstance(node, Token):
             print(node)
-            widget = ASTTokenWidget(node, parentWidget)
-        elif isinstance(node, ASTBranch):
+            codeLines = node.code.split("\n")
+            print(codeLines)
+            for index, codeLine in enumerate(codeLines):
+                print(codeLine)
+                if len(codeLine) > 0:
+                    ASTTokenWidget(node, codeLine, parentWidget)
+                if len(codeLines) > index + 1:
+                    row = ASTRowWidget(self, node.row + index)
+                    self.rows.append(row)
+                    self.layout.addWidget(row)
+                    self._addSpacerToLayout(parentWidget.layout)
+                    parentWidget = row
+        elif isinstance(node, ASTBranch) and False:
             widget = ASTBranchWidget(node, parentWidget)
             for child in node.children:
-                self._nodeToWidget(child, node, widget, lastRow)
+                parentWidget = self._nodeToWidget(child, node, widget)
         else:
             raise Error("Unknown AST node class: " + type(node))
-        lastRow.addAstWidget(widget)
+        return parentWidget
+        # lastRow.addAstWidget(widget)
+        
+    def _addSpacerToLayout(self, layout):
+        layout.addSpacerItem(
+            QtWidgets.QSpacerItem(
+                0,
+                0, 
+                QtWidgets.QSizePolicy.Policy.Expanding,
+                QtWidgets.QSizePolicy.Policy.Minimum
+            )
+        )
         
     ### QTextDocument
     

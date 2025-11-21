@@ -4,6 +4,7 @@ from mimetypes import MimeTypes
 
 from py.Languages.PythonLanguage import PythonLanguage
 from py.Languages.PHPLanguage import PHPLanguage
+from py.Languages.JavaLanguage import JavaLanguage
 from py.Languages.MarkdownLanguage import MarkdownLanguage
 from py.Languages.UnknownLanguage import UnknownLanguage
 from py.Hub import Log, Hub
@@ -24,7 +25,10 @@ class LanguageSelector:
         fileExtension = os.path.splitext(filePath)[-1]
         if fileExtension == ".md":
             language = MarkdownLanguage(self.hub)
-        
+            
+        if fileExtension == ".java":
+            language = JavaLanguage(self.hub)
+       
         if language == None:
             language = UnknownLanguage(self.hub)
         

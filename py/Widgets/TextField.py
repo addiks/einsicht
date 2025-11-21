@@ -47,6 +47,7 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
             length -= 1
 
     def indentIn(self):
+        print("indentIn")
         cursor = self.textCursor()
         anchor = cursor.anchor()
         position = cursor.position()
@@ -54,8 +55,10 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
         doc = self.document()
         text = doc.toPlainText()
         
+        print([anchor, position])
         if anchor == position:
             column = 0
+            print([position, column, text[position - column - 1]])
             while position - column - 1 >= 0 and text[position - column - 1] != "\n":
                 column += 1
             cursor.insertText(''.ljust(4 - (column % 4)))
@@ -69,12 +72,17 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
             #editCursor.setPosition(block.position())
             #editCursor.insertText(''.ljust(4))
             
-            while block.position() < position:
+            while block.position() + block.length() - 1 <= position:
+                print([block.position(), position])
                 editCursor.setPosition(block.position())
                 editCursor.insertText(''.ljust(4))
+                position += 4
                 block = block.next()
+                if not block.isValid():
+                    break
 
     def indentOut(self):
+        print("indentOut")
         cursor = self.textCursor()
         anchor = cursor.anchor()
         position = cursor.position()
@@ -82,6 +90,7 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
         doc = self.document()
         text = doc.toPlainText();
         
+        print([anchor, position])
         if anchor == position:
             while position > 0 and text[position - 1] != "\n":
                 position -= 1
@@ -105,11 +114,17 @@ class TextField(QtWidgets.QPlainTextEdit, TextFieldApi):
             #for i in range(0, 4):
             #    editCursor.deleteChar()
             
-            while block.position() < position:
+            print([block.position() + block.length() - 1, position])
+            while block.position() + block.length() - 1 <= position:
                 editCursor.setPosition(block.position())
                 for i in range(0, 4):
                     editCursor.deleteChar()
+                    position -= 1
+                print([block, block.next(), block.isValid()])
                 block = block.next()
+                if not block.isValid():
+                    break
+                print([block.position() + block.length() - 1, position])
  
     def deleteCurrentLines(self):
         cursor = self.textCursor()

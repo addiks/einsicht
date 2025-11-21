@@ -1,0 +1,30 @@
+
+.T_CLASS, .T_DEF {
+    font-weight: bold;
+    color: darkred;
+}
+
+.keyword {
+    font-weight: bold;
+    color: darkmagenta;
+}
+
+.T_NONE, boolean {
+    color: magenta;
+}
+
+import-from {
+    color: darkyellow;
+}
+
+[code="self"], [code="super"] {
+    font-weight: bold;
+}
+
+.T_LITERAL, .T_NUMBER {
+    color: magenta;
+}
+
+.T_COMMENT {
+    color: gray;
+}

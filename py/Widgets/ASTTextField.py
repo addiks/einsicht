@@ -4,19 +4,21 @@ import os
 
 from py.Hub import Hub, Log, on
 from py.Api import TextField as TextFieldApi
+from py.Languages.Language import Language
 from py.Languages.AbstractSyntaxTree import ASTRoot, ASTBranch, ASTNode
 from py.Languages.Tokens import Token
+from py.Languages.SemanticASTNodes import CodeBlock
 from py.Widgets.AST.ASTWidget import ASTWidget, ASTRowWidget, ASTRowWidgetContainer
 from py.Widgets.AST.ASTWidget import ASTBranchWidget, ASTTokenWidget
 from py.Widgets.AST.ASTRootWidget import ASTRootWidget
 
-class ASTTextField(QtWidgets.QScrollArea, TextFieldApi, ASTRowWidgetContainer):
+class ASTTextField(QtWidgets.QWidget, TextFieldApi, ASTRowWidgetContainer):
     def __init__(
         self, 
         parent: QtWidgets.QWidget, 
         hub: Hub
     ):
-        QtWidgets.QScrollArea.__init__(self, parent)
+        QtWidgets.QWidget.__init__(self, parent)
         
         self.parent = parent
         self._document = QtGui.QTextDocument(self)
@@ -30,11 +32,23 @@ class ASTTextField(QtWidgets.QScrollArea, TextFieldApi, ASTRowWidgetContainer):
         
         self.rows = []
         
-        label = QtWidgets.QLabel()
-        
-        self.layout = QtWidgets.QVBoxLayout(self)
+        self.layout = QtWidgets.QStackedLayout(self)
         self.layout.setSpacing(0)
         self.layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.scrollArea = QtWidgets.QScrollArea(self)
+        self.scrollArea.layout = QtWidgets.QStackedLayout(self.scrollArea)
+        self.scrollArea.layout.setSpacing(0)
+        self.scrollArea.layout.setContentsMargins(0, 0, 0, 0)
+        self.scrollArea.setWidgetResizable(False)
+        self.layout.addWidget(self.scrollArea)
+        
+        self.frame = QtWidgets.QFrame(self.scrollArea)
+        self.frame.layout = QtWidgets.QVBoxLayout(self.frame)
+        self.frame.layout.setSpacing(0)
+        self.frame.layout.setContentsMargins(0, 0, 0, 0)
+        self.scrollArea.layout.addWidget(self.frame)
+        self.scrollArea.setWidget(self.frame)
         
     @on(ASTRoot)
     def onNewAST(self):
@@ -43,20 +57,19 @@ class ASTTextField(QtWidgets.QScrollArea, TextFieldApi, ASTRowWidgetContainer):
     def _processNewAst(self, root: ASTRoot):
         self.rows = []
         self.rows.append(ASTRowWidget(self, 0))
-        self.layout.addWidget(self.rows[0])
+        self.frame.layout.addWidget(self.rows[0])
         
         parentWidget = self.rows[0]
         
-        i=0
+        #i=0
         for node in root.children:
             parentWidget = self._nodeToWidget(node, root, parentWidget)
-            i+=1
-            if i > 200:
-                break
+            #i+=1
+            #if i > 200:
+            #    break
         
         self._addSpacerToLayout(parentWidget.layout)
-    
-        self._addSpacerToLayout(self.layout)
+        self._addSpacerToLayout(self.frame.layout)
     
         minimumWidth = 100    
         heightSum = 0
@@ -66,7 +79,8 @@ class ASTTextField(QtWidgets.QScrollArea, TextFieldApi, ASTRowWidgetContainer):
             minimumWidth = max(100, min(1000, max(minimumWidth, rowSize.width())))
             print(rowSize)
             
-        self.setMinimumSize(
+        self.setMinimumSize(QtCore.QSize(300, 100))
+        self.frame.setMinimumSize(
             minimumWidth, 
             max(100, min(1000, heightSum))
         )
@@ -74,12 +88,22 @@ class ASTTextField(QtWidgets.QScrollArea, TextFieldApi, ASTRowWidgetContainer):
         self.parent.adjustSize()
         self.parent.updateGeometry()
         
+        if self.hub.has(Language):
+            language = self.hub.get(Language)
+            stylesheet = language.stylesheet()
+            if stylesheet != None:
+                stylesheet.applyStylesToQtWidget(self)
+        
     def _nodeToWidget(
         self, 
         node: ASTNode,
         parentNode: ASTBranch,
         parentWidget: QtWidgets.QWidget
     ):
+        for prepended in node.prepended:
+            parentWidget = self._nodeToWidget(prepended, node, parentWidget)
+            #if newParentWidget != widget:
+            #    parentWidget = newParentWidget
         if isinstance(node, Token):
             print(node)
             codeLines = node.code.split("\n")
@@ -91,15 +115,20 @@ class ASTTextField(QtWidgets.QScrollArea, TextFieldApi, ASTRowWidgetContainer):
                 if len(codeLines) > index + 1:
                     row = ASTRowWidget(self, node.row + index)
                     self.rows.append(row)
-                    self.layout.addWidget(row)
+                    self.frame.layout.addWidget(row)
                     self._addSpacerToLayout(parentWidget.layout)
                     parentWidget = row
-        elif isinstance(node, ASTBranch) and False:
+        elif isinstance(node, ASTBranch) or isinstance(node, CodeBlock):
             widget = ASTBranchWidget(node, parentWidget)
             for child in node.children:
-                parentWidget = self._nodeToWidget(child, node, widget)
+                newParentWidget = self._nodeToWidget(child, node, widget)
+                if newParentWidget != widget:
+                    parentWidget = newParentWidget
+                    widget = parentWidget
         else:
-            raise Error("Unknown AST node class: " + type(node))
+            raise Exception("Unknown AST node class: " + str(type(node)))
+        for appended in node.appended:
+            parentWidget = self._nodeToWidget(appended, node, parentWidget)
         return parentWidget
         # lastRow.addAstWidget(widget)
         

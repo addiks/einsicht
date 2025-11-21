@@ -43,6 +43,7 @@ class EditorWindow(QtWidgets.QMainWindow): # QWidget
             hub.get(FileAccess).baseDir() + "/resources/einsicht-logo-v1.512.png"
         )))
         
+        self.setMouseTracking(True)
         self._textChangeCounter = 0
         
         self.highlighter = None

@@ -63,6 +63,7 @@ Features that will **never** be implemented:
 * XML / HTML
 * Javascipt / Typescript
 * Java or PHP (not sure which will come first, both are important to me)
+* SQL
 
 
 ## Why SDI?

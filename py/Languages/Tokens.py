@@ -17,10 +17,18 @@ class Token(ASTNode):
     def grammarKey(self):
         return self.tokenName
 
+class TokenMatcher:
+    def lexNext(self, text): # return: (text, TokenDef|null)
+        raise NotImplementedError
+        
+    def mutateToken(self, token: Token, newCode: str) -> Token:
+        raise NotImplementedError
+        
 class TokenDef:
-    def __init__(self, tokenName, code):
+    def __init__(self, tokenName: str, code: str, matcher: TokenMatcher):
         self.tokenName = tokenName
         self.code = code
+        self.matcher = matcher
 
     def toToken(self, language, row, col, offset):
         return Token(
@@ -34,14 +42,9 @@ class TokenDef:
 
 ### TOKEN MATCHER
 
-class TokenMatcher:
-    def lexNext(self, text): # return: (text, TokenDef|null)
-        raise NotImplementedError
-        
 class KeywordsTokenMatcher(TokenMatcher):
-    def __init__(self, keywords, language):
+    def __init__(self, keywords):
         self._keywords = keywords
-        self._language = language
 
     def lexNext(self, text): # return: (text, TokenDef|None)
         token = None
@@ -49,7 +52,7 @@ class KeywordsTokenMatcher(TokenMatcher):
             if text[0:len(keyword)].upper() == keyword.upper():
                 if not text[len(keyword):len(keyword)+1].isidentifier():
                     tokenName = "T_" + keyword.upper()
-                    token = TokenDef(tokenName, keyword)
+                    token = TokenDef(tokenName, keyword, self)
                     text = text[len(keyword):]
             
         return (text, token)
@@ -69,7 +72,7 @@ class LiteralTokenMatcher(TokenMatcher):
                 if index >= len(text) or text[index] == self._delimitter:
                     end = True
             literal = text[0:index + 1]
-            token = TokenDef(self._tokenName, literal)
+            token = TokenDef(self._tokenName, literal, self)
             text = text[len(literal):]
         return (text, token)
 
@@ -84,7 +87,7 @@ class RegexMatcher(TokenMatcher):
         rematch = re.match(self._pattern, text)
         if rematch != None:
             matchedText = rematch.group(self._groupNo)
-            token = TokenDef(self._tokenName, matchedText)
+            token = TokenDef(self._tokenName, matchedText, self)
             text = text[len(matchedText):]
         return (text, token)
         
@@ -99,7 +102,7 @@ class DirectTokenMatcher(TokenMatcher):
         token = None
         for directText in self._directTexts:
             if text[0:len(directText)] == directText:
-                token = TokenDef(self._tokenName, directText)
+                token = TokenDef(self._tokenName, directText, self)
                 text = text[len(directText):]
                 break
         return (text, token)

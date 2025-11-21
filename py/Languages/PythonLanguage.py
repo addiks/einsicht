@@ -1,8 +1,11 @@
 
+import os
+
 from PySide6.QtGui import QTextCharFormat, QFont
 from PySide6.QtCore import Qt
 
 from .Language import Language, PositionDef, ClassDef, MethodDef, MemberDef, FunctionDef, dumpAST
+from .AstStyles import CssAsAstStylesheet
 
 from .ASTPatterns import OptionalNode, NodeSequence, RepeatingNode
 from .ASTPatterns import NodeBranch, LateDefinedASTPattern
@@ -31,7 +34,7 @@ class PythonLanguage(Language):
                 "True", "False", "None",
                 "and", "or", "xor", "not",
                 "del", "as", "in", "breakpoint"
-            ], self),
+            ]),
             RegexMatcher(r'\n( +)?(?=\n)', "T_INDENTATION_SUPERFLUOUS"),
             RegexMatcher(r'\n( +)?', "T_INDENTATION"),
             RegexMatcher(r'\s+', "T_WHITESPACE"),
@@ -214,6 +217,9 @@ class PythonLanguage(Language):
             block = stack.pop()
             stack[-1].addStatement(block)
         return stack[0].children
+        
+    def stylesheet(self):
+        return CssAsAstStylesheet(os.path.dirname(__file__) + "/python.css")
 
     def formatForNode(self, node):
         if type(node) == Token: 

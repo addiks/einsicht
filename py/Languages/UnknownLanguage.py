@@ -35,5 +35,8 @@ class UnknownLanguage(Language):
             ])
         ]
         
+    def stylesheet(self):
+        return None
+
     def formatForNode(self, node):
         return None

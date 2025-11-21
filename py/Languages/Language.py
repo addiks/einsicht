@@ -42,6 +42,9 @@ class Language: # abstract
     def groupStatementsIntoBlocks(self, nodes): # list<ASTNode>
         return nodes
 
+    def stylesheet(self):
+        raise NotImplementedError
+
     def formatForNode(self, node): # QFormat
         raise NotImplementedError
 

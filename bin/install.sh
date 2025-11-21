@@ -19,10 +19,11 @@ BASEDIR="` dirname $( dirname $( realpath $0 ) ) `"
     ENV_BIN="$ENV_DIR/bin"
     PYTHON="$ENV_BIN/python3"
     PIP="$ENV_BIN/pip3"
+    YOYO="$ENV_BIN/yoyo"
     
     source "$ENV_BIN/activate"
     
-    $PYTHON $PIP install systemd systemd-python robotframework
+    $PYTHON $PIP install systemd systemd-python robotframework tinycss2 pyside6-essentials PySide6-Addons
 )
 
 DESKTOP_DIR="$HOME/.local/share/applications"

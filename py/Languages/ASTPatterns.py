@@ -196,7 +196,7 @@ class RepeatingNode(NodePattern):
             start = None
         
         return (allReplacedNodes, start)
-            
+        
 class LateDefinedASTPattern(NodePattern):
     def __init__(self, producedNodeKey=None):
         self._pattern = None

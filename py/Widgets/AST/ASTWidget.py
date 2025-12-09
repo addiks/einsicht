@@ -91,8 +91,9 @@ class ASTTokenWidget(ASTWidget):
         
         width = 0
         height = 0
+        characterWidget = None
         for character in codeLine:
-            characterWidget = ASTCharacterWidget(self, character)
+            characterWidget = ASTCharacterWidget(self, character, characterWidget)
             self.characterWidgets.append(characterWidget)
             self.layout.addWidget(characterWidget)
             characterSize = characterWidget.sizeHint()
@@ -108,10 +109,17 @@ class ASTCharacterWidget(QtWidgets.QWidget):
     def __init__(
         self,
         parent: ASTTokenWidget,
-        character: str
+        character: str,
+        previous: Self
     ):
         QtWidgets.QWidget.__init__(self)
+        self.isShowingCursor = False
         self.character = character
+        self.previous = previous
+        self.next = None
+        
+        if previous != None:
+            previous.next = self
         
         self.label = ASTCharacterWidgetLabel(character, self)
         self.label.setScaledContents(False)
@@ -133,9 +141,14 @@ class ASTCharacterWidget(QtWidgets.QWidget):
     def mouseMoveEvent(self, event):
         # print(event)
         if event.pos().x() > (self.width() / 2):
-            self.label.showRightCursorPreview()
+            self.showRightCursorPreview()
+            if self.next != None:
+                self.next.showLeftCursorPreview()
         else:
-            self.label.showLeftCursorPreview()
+            self.showLeftCursorPreview()
+            if self.previous != None:
+                self.previous.showRightCursorPreview()
+            
         QtWidgets.QWidget.mouseMoveEvent(self, event)
         
     def enterEvent(self, event):
@@ -143,19 +156,28 @@ class ASTCharacterWidget(QtWidgets.QWidget):
         QtWidgets.QWidget.enterEvent(self, event)
         
     def leaveEvent(self, event):
-        self.label.hideCursorPreview()
+        self.hideCursorPreview()
+        self.setStyleSheet("")
         # print(event)
         QtWidgets.QWidget.leaveEvent(self, event)
+        
+    def showRightCursorPreview(self):
+        self.isShowingCursor = True
+        self.setStyleSheet("border-right: 1px solid grey; border-style: solid; padding-left: -4px")
+        
+    def showLeftCursorPreview(self):
+        self.isShowingCursor = True
+        self.setStyleSheet("border-left: 1px solid grey; border-style: solid; padding-left: -1px")
+        
+    def hideCursorPreview(self):
+        self.isShowingCursor = False
+        self.setStyleSheet("")
+        if self.next != None and self.next.isShowingCursor:
+            self.next.hideCursorPreview()
+        elif self.previous != None and self.previous.isShowingCursor:
+            self.previous.hideCursorPreview()
         
 class ASTCharacterWidgetLabel(QtWidgets.QLabel):
     def __init__(self, character: str, parent: ASTCharacterWidget):
         QtWidgets.QLabel.__init__(self, character, parent)
         
-    def showRightCursorPreview(self):
-        self.setStyleSheet("border-right: 1px solid grey")
-        
-    def showLeftCursorPreview(self):
-        self.setStyleSheet("border-left: 1px solid grey")
-        
-    def hideCursorPreview(self):
-        self.setStyleSheet("")

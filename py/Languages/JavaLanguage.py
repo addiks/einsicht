@@ -27,10 +27,10 @@ class JavaLanguage(Language):
             KeywordsTokenMatcher([
                 "package", "import", 
                 "public", "protected", "private",
-                "static", "final",
+                "static", "abstract", "final",
                 "new", "class", "interface", "enum", "record",
                 "return", "break", "continue", "throw",
-                "void", "null", "int",
+                "void", "null", "boolean", "int", "long", "double",
                 "if", "else", "while", "for", 
                 "try", "catch", "finally",
                 "assert",
@@ -41,6 +41,7 @@ class JavaLanguage(Language):
             RegexMatcher(r'[a-zA-Z_][a-zA-Z0-9_]+', "T_SYMBOL"),
             RegexMatcher(r'[0-9_]+(\.[0-9]*)?', "T_NUMBER"),
             RegexMatcher(r'\//([^\n]*)', "T_COMMENT"),
+            RegexMatcher(r'\/\*.*\*\/', "T_COMMENT"),
             DirectTokenMatcher([
                 ".", ",", "(", ")", "[", "]", "{", "}", ":", "="
             ], "T_SPECIAL_CHAR"),
@@ -78,10 +79,10 @@ class JavaLanguage(Language):
             if node.tokenName in [
                 "T_PACKAGE", "T_IMPORT", 
                 "T_PUBLIC", "T_PROTECTED", "T_PRIVATE",
-                "T_STATIC", "T_FINAL",
+                "T_STATIC", "T_FINAL", "T_ABSTRACT",
                 "T_NEW", "T_CLASS", "T_INTERFACE", "T_ENUM", "T_RECORD", 
                 "T_RETURN", "T_THROW", "T_BREAK", "T_CONTINUE",
-                "T_VOID", "T_NULL", "T_INT",
+                "T_VOID", "T_NULL", "T_BOOLEAN", "T_INT", "T_LONG", "T_DOUBLE",
                 "T_IF", "T_ELSE", "T_WHILE", "T_FOR",
                 "T_TRY", "T_CATCH", "T_FINALLY",
                 "T_ASSERT", 

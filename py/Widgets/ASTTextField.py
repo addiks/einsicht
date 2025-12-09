@@ -99,7 +99,7 @@ class ASTTextField(QtWidgets.QWidget, TextFieldApi, ASTRowWidgetContainer):
         node: ASTNode,
         parentNode: ASTBranch,
         parentWidget: QtWidgets.QWidget
-    ):
+    ) -> QtWidgets.QWidget:
         for prepended in node.prepended:
             parentWidget = self._nodeToWidget(prepended, node, parentWidget)
             #if newParentWidget != widget:

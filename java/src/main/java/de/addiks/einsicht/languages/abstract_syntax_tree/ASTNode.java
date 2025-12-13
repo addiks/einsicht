@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 
@@ -174,7 +175,10 @@ public class ASTNode {
         return false;
     }
 
-    public int offsetIn(List<ASTNode> nodes) {
+    public @Nullable Integer offsetIn(List<ASTNode> nodes) {
+        if (!nodes.contains(this)) {
+            return null;
+        }
         return nodes.indexOf(this);
     }
 
@@ -254,6 +258,19 @@ public class ASTNode {
 
     public List<ASTNode> getAppended() {
         return appended;
+    }
+
+    public void iterate(Consumer<ASTNode> consumer) {
+        for (ASTNode predecessor : prepended) {
+            predecessor.iterate(consumer);
+        }
+        consumer.accept(this);
+        for (ASTNode child : children) {
+            child.iterate(consumer);
+        }
+        for (ASTNode successor : appended) {
+            successor.iterate(consumer);
+        }
     }
 
     public static class Selector {

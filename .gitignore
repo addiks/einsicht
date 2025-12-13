@@ -1,4 +1,11 @@
 /env
 /test/behaviour/var/*
+/*.gradle
+/app
+/app.*
+/*.bin
+/build/
+*/build/*
 *.log
 __pycache__
+gradle-wrapper.*

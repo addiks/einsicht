@@ -1,10 +1,12 @@
 package de.addiks.einsicht.languages;
 
 import de.addiks.einsicht.Hub;
+import de.addiks.einsicht.languages.abstract_syntax_tree.ASTBranch;
 import de.addiks.einsicht.languages.abstract_syntax_tree.ASTNode;
 import de.addiks.einsicht.languages.abstract_syntax_tree.ASTRoot;
-import de.addiks.einsicht.languages.abstract_syntax_tree.patterns.NodeBranch;
 import de.addiks.einsicht.languages.abstract_syntax_tree.patterns.NodePattern;
+import de.addiks.einsicht.languages.semantics.Semantic;
+import de.addiks.einsicht.languages.tokens.ConsumableString;
 import de.addiks.einsicht.languages.tokens.Token;
 import de.addiks.einsicht.languages.tokens.TokenDef;
 import de.addiks.einsicht.languages.tokens.TokenMatcher;
@@ -32,7 +34,7 @@ public abstract class Language {
         }
     }
 
-    private final Map<String, List<Token>> lexCache = new HashMap<>();
+    private final Map<String, List<ASTNode>> lexCache = new HashMap<>();
     private final Map<String, ParseResult> parseCache = new HashMap<>();
     private final Hub hub;
     private Map<String,List<NodePattern>> grammarMap = null;
@@ -52,6 +54,8 @@ public abstract class Language {
 
     public abstract List<NodePattern> grammar();
 
+    public abstract Map<String, Semantic.Factory> semantics();
+
     public List<ASTNode> groupStatementsIntoBlocks(List<ASTNode> nodes) {
         return nodes;
     }
@@ -63,11 +67,11 @@ public abstract class Language {
     public ParseResult parse(String code, Path filepath, @Nullable ASTRoot previousAST, @Nullable List<Token> previousTokens) {
         String hash = new String(md5.digest(code.getBytes(StandardCharsets.UTF_8)));
         if (!parseCache.containsKey(hash)) {
-            List<Token> tokens = lex(code, previousTokens);
-            if (tokens.size() > 0) {
-                List<NodePattern> grammar = grammar();
+            List<ASTNode> tokens = lex(code, previousTokens);
+            if (!tokens.isEmpty()) {
+                Map<String, List<NodePattern>> grammar = grammarMap();
 
-                tokens = normalize(tokens);
+                normalize(tokens);
 
                 List<ASTNode> nodes = applyGrammar(tokens, grammar);
                 nodes = groupStatementsIntoBlocks(nodes);
@@ -77,44 +81,115 @@ public abstract class Language {
                 }
 
                 ASTRoot ast = new ASTRoot(nodes, filepath);
+
+                Map<String, Semantic.Factory> semanticFactories = semantics();
+                Map<Class<? extends Semantic>, List<Semantic>> semantics = new HashMap<>();
+                Map<Class<? extends Semantic>, Semantic.Factory> contextualFactories = new HashMap<>();
+                for (Semantic.Factory factory : semanticFactories.values()) {
+                    if (factory instanceof Semantic.Factory.Contextual contextualFactory) {
+                        contextualFactories.put(contextualFactory.root(), contextualFactory);
+                    }
+                }
+                ast.iterate(node -> {
+                    String key = node.grammarKey();
+                    if (semanticFactories.containsKey(key)
+                            && node instanceof ASTBranch branch
+                            && semanticFactories.get(key) instanceof Semantic.Factory.Local localFactory) {
+                        Semantic.Local semantic = localFactory.forBranch(branch);
+                        branch.assignSemantic(semantic);
+                        if (contextualFactories.containsKey(semantic.getClass())) {
+                            Semantic.Factory.Contextual contextualFactory = contextualFactories.get(semantic.getClass());
+
+                            contextualFactory.combine(semantic, ...);
+                        }
+                    }
+                });
+
                 hub.register(ast);
 
                 parseCache.put(hash, new ParseResult(ast, tokens));
             }
         }
-        return parseCache.getOrDefault(hash, new ParseResult(null, tokens));
+        return parseCache.getOrDefault(hash, new ParseResult(null, List.of()));
     }
 
     public record ParseResult(
             @Nullable ASTRoot previousAST,
-            List<Token> previousTokens
+            List<ASTNode> previousTokens
     ) {}
 
-    public List<ASTNode> applyGrammar(List<Token> nodes, List<NodePattern> grammar) {
+    private List<ASTNode> applyGrammar(List<ASTNode> nodes, Map<String, List<NodePattern>> grammar) {
         Map<String, List<ASTNode>> nodeMap = mapNodes(nodes);
         while (!nodeMap.isEmpty()) {
             boolean hasMutated = false;
-            for (String key : nodeMap.keySet()) {
+            for (String grammarKey : nodeMap.keySet()) {
+                if (!grammar.containsKey(grammarKey)) {
+                    continue;
+                }
+                for (ASTNode node : new ArrayList<>(nodeMap.get(grammarKey))) {
+                    for (NodePattern pattern : grammar.get(grammarKey)) {
 
+                        Integer nodeIndex = node.offsetIn(nodes);
+                        if (nodeIndex == null) {
+                            break;
+                        }
+
+                        if (pattern.matches(nodes, nodeIndex)) {
+                            NodePattern.MutationResult result = pattern.mutate(nodes, nodeIndex);
+
+                            for (ASTNode replacedNode : result.addedNodes()) {
+                                hasMutated = true;
+
+                                String replacedNodeKey = replacedNode.grammarKey();
+                                nodeMap.get(replacedNodeKey).remove(replacedNode);
+                                if (nodeMap.get(replacedNodeKey).isEmpty()) {
+                                    nodeMap.remove(replacedNodeKey);
+                                }
+
+                                String code = replacedNode.getCode();
+                                if (nodeMap.containsKey(code) && nodeMap.get(code).contains(replacedNode)) {
+                                    nodeMap.get(code).remove(replacedNode);
+                                    if (nodeMap.get(code).isEmpty()) {
+                                        nodeMap.remove(code);
+                                    }
+                                }
+                            }
+
+                            if (result.newIndex() != null) {
+                                hasMutated = true;
+                                ASTNode newNode = nodes.get(result.newIndex());
+                                nodeMap.computeIfAbsent(newNode.grammarKey(), k -> new ArrayList<>()).add(newNode);
+                            }
+                        }
+                    }
+                }
+                if (nodeMap.containsKey(grammarKey) && nodeMap.get(grammarKey).isEmpty()) {
+                    nodeMap.remove(grammarKey);
+                }
+            }
+            if (!hasMutated) {
+                break;
             }
         }
+        return nodes;
     }
 
-    private Map<String, List<Token>> mapNodes(List<Token> nodes) {
-        Map<String, List<Token>> nodeMap = new HashMap<>();
-        for (int index = 0; index < nodes.size(); index++) {
-            Token token = nodes.get(index);
-            nodeMap.computeIfAbsent(token.tokenName(), t -> new ArrayList<>()).add(token);
-            nodeMap.computeIfAbsent(token.getCode(), t -> new ArrayList<>()).add(token);
+    private Map<String, List<ASTNode>> mapNodes(List<ASTNode> nodes) {
+        Map<String, List<ASTNode>> nodeMap = new HashMap<>();
+        for (ASTNode node : nodes) {
+            if (node instanceof Token token) {
+                nodeMap.computeIfAbsent(token.tokenName(), t -> new ArrayList<>()).add(token);
+                nodeMap.computeIfAbsent(token.getCode(), t -> new ArrayList<>()).add(token);
+            }
         }
         return nodeMap;
     }
 
-    private List<ASTNode> normalize(List<ASTNode> nodes) {
+    private void normalize(List<ASTNode> nodes) {
         int index = 0;
         Integer lastRelevantIndex = null;
         List<Integer> irrelevantIndexes = new ArrayList<>();
-        int indexShift = 0;
+        int indexShift;
         while (index < nodes.size()) {
             ASTNode node = nodes.get(index);
             if (isNodeRelevantForGrammar(node)) {
@@ -143,14 +218,12 @@ public abstract class Language {
                 node.append(irrelevantNode);
             }
         }
-
-        return nodes;
     }
 
-    public List<Token> lex(String code, @Nullable List<Token> previousTokens) {
+    public List<ASTNode> lex(String code, @Nullable List<Token> previousTokens) {
         String hash = new String(md5.digest(code.getBytes(StandardCharsets.UTF_8)));
         if (!lexCache.containsKey(hash)) {
-            List<Token> tokens = new ArrayList<>();
+            List<ASTNode> tokens = new ArrayList<>();
 
             AtomicInteger row = new AtomicInteger(1);
             AtomicInteger col = new AtomicInteger(1);
@@ -159,30 +232,27 @@ public abstract class Language {
             code = code.replaceAll("\r\n", "\n");
             code = code.replaceAll("\r", "\n");
 
-            AtomicReference<String> codeRef = new AtomicReference<>(code);
-
+            ConsumableString consumableCode = new ConsumableString(code);
             List<TokenMatcher> matchers = tokenMatchers();
 
             while (!code.isEmpty()) {
                 int beforeLength = code.length();
                 for (TokenMatcher matcher : matchers) {
-                    if (codeRef.get().length() <= 0) {
+                    int lengthBefore = consumableCode.length();
+                    if (lengthBefore <= 0) {
                         break;
                     }
 
-                    int lengthBefore = codeRef.get().length();
-                    TokenDef tokenDef = matcher.lexNext(codeRef);
-
+                    TokenDef tokenDef = matcher.lexNext(consumableCode);
                     if (tokenDef != null) {
                         tokens.add(tokenDef.toToken(this, row.get(), col.get(), offset.get()));
                     }
 
-                    String processedCode = codeRef.get().substring(0, lengthBefore - codeRef.get().length());
-
+                    String processedCode = consumableCode.consumed(lengthBefore - consumableCode.length());
                     updateRowColOffsetForProcessed(offset, row, col, processedCode);
                 }
-                if (beforeLength == codeRef.get().length()) {
-                    String invalidChar = codeRef.get().substring(0,1);
+                if (beforeLength == consumableCode.length()) {
+                    String invalidChar = consumableCode.substring(0,1);
                     tokens.add(new Token(
                             this,
                             "T_INVALID",
@@ -192,7 +262,7 @@ public abstract class Language {
                             offset.get()
                     ));
                     updateRowColOffsetForProcessed(offset, row, col, invalidChar);
-                    codeRef.set(codeRef.get().substring(1));
+                    consumableCode.consume(1);
                 }
             }
             lexCache.put(hash, tokens);
@@ -227,5 +297,32 @@ public abstract class Language {
             }
         }
         return grammarMap;
+    }
+
+    public static void dumpAST(List<ASTNode> nodes) {
+        dumpAST(nodes, 0, null);
+    }
+
+    public static void dumpAST(List<ASTNode> nodes, int level, @Nullable Integer depth) {
+        if (depth != null && level + 1 > depth) {
+            return;
+        }
+        for (ASTNode node : nodes) {
+            String nodeDescr = "node: " + node.getGrammarKey();
+            if (node instanceof Token token) {
+                nodeDescr = token.tokenName() + " - " + token.getCode().trim();
+            }
+            System.out.println(
+                    String.format("%1$3s", node.getRow()).replace(' ', '0') +
+                    "-" +
+                    String.format("%1$" + level + "s", "|") +
+                    nodeDescr +
+                    ">" +
+                    node.getCode().trim()
+            );
+        }
+        if (level == 0) {
+            System.out.println();
+        }
     }
 }

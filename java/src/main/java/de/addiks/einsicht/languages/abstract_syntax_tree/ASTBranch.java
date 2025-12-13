@@ -1,14 +1,17 @@
 package de.addiks.einsicht.languages.abstract_syntax_tree;
 
 import de.addiks.einsicht.languages.Language;
+import de.addiks.einsicht.languages.semantics.Semantic;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class ASTBranch extends ASTNode {
     private final Map<ASTNode, Integer> childToIndex;
+    private final Map<Class<? extends Semantic>, Semantic> semantics = new HashMap<>();
 
     public ASTBranch(
             List<ASTNode> children,
@@ -24,12 +27,21 @@ public class ASTBranch extends ASTNode {
         }
     }
 
-    private static String codeOf(List<ASTNode> nodes) {
-        StringBuilder code = new StringBuilder();
-        for (ASTNode child : nodes) {
-            child.reconstructCode(code);
-        }
-        return code.toString();
+    public List<Semantic> semantics() {
+        return new ArrayList<>(semantics.values());
+    }
+
+    public boolean hasSemantic(Class<Semantic> semanticClass) {
+        return semantics.containsKey(semanticClass);
+    }
+
+    public Semantic semantic(Class<Semantic> semanticClass) {
+        return semantics.get(semanticClass);
+    }
+
+    public void assignSemantic(Semantic semantic) {
+        assert !semantics.containsKey(semantic.getClass());
+        semantics.put(semantic.getClass(), semantic);
     }
 
     @Override
@@ -53,4 +65,13 @@ public class ASTBranch extends ASTNode {
         }
         return null;
     }
+
+    private static String codeOf(List<ASTNode> nodes) {
+        StringBuilder code = new StringBuilder();
+        for (ASTNode child : nodes) {
+            child.reconstructCode(code);
+        }
+        return code.toString();
+    }
+
 }

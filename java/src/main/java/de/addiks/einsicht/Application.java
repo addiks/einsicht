@@ -9,10 +9,14 @@ import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.security.NoSuchAlgorithmException;
+import java.util.List;
 
+import de.addiks.einsicht.languages.Language;
 import de.addiks.einsicht.languages.LanguageSelector;
+import de.addiks.einsicht.abstract_syntax_tree.ASTNode;
+import de.addiks.einsicht.abstract_syntax_tree.ASTRoot;
+import de.addiks.einsicht.versioning.Versioning;
 import de.addiks.einsicht.versioning.VersioningSelector;
-import org.freedesktop.dbus.exceptions.DBusException;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
@@ -38,13 +42,12 @@ public class Application {
     
     private boolean isReadyForInteraction = false;
     private int textChangeCounter = 0;
-    private /* MessageBroker */ Object messageBroker = null;
-    private /* Language */ Object language = null;
-    private /* Versioning */ Object versioning;
+    private MessageBroker messageBroker = null;
+    private Language language = null;
+    private Versioning versioning;
     private Object projectIndex;
-    private Object tokens;
-    private Object syntaxTree;
-    private Object highlighter;
+    private List<ASTNode> tokens;
+    private ASTRoot syntaxTree;
     
     private String fileContent = "";
     private Path filePath = null;
@@ -52,17 +55,18 @@ public class Application {
     private int lengthOnDisk = 0;
     
 
-    public static int main(String[] argv) throws DBusException, IOException, InterruptedException {
+    public static int main(String[] argv) {
         try {
             Application.instance().run(argv);
             return 0;
 //        } catch (SystemExit exception) {
 //            return 0;
         
-//        } catch (FileAlreadyOpenOnOtherProcessException exception) {
-//            return 0;
+        } catch (MessageBroker.FileAlreadyOpenOnOtherProcessException exception) {
+            return 0;
 
         } catch (Exception exception) {
+            LOGGER.error("Uncatched: {}", exception.getMessage(), exception);
             return -1;
         }
     }
@@ -81,16 +85,13 @@ public class Application {
         reset();
         window = new EditorWindow(hub);
         versioningSelector = new VersioningSelector(hub);
-        
-        // hub.on(hub.get(TextDocument).contentsChange, this::onDocumentContentsChanged);
-        // executor.shedule(10, Milliseconds,() -> this.onFileContentChanged(true)); // or whatever
     }
     
     public void reset() {
         
     }
     
-    public void run(String[] argv) throws IOException {
+    public void run(String[] argv) throws IOException, MessageBroker.FileAlreadyOpenOnOtherProcessException {
         Path filePath = null;
         if (argv.length > 1) {
             filePath = FileSystems.getDefault().getPath(argv[1]).toAbsolutePath();
@@ -113,9 +114,9 @@ public class Application {
     
     public void closeFile() {
         reset();
-        // if (messageBroker != null) {
-        //     messageBroker.close();
-        // }
+        if (messageBroker != null) {
+            messageBroker.close();
+        }
         hub.notify(FileAccess.class, "closeFile");
         LOGGER.info("Closed file");
     }
@@ -124,8 +125,11 @@ public class Application {
         this.filePath = filePath.toAbsolutePath();
         System.out.println(filePath);
         // Log.setPrefix(self.fileNameDescription() + ' - ')
-        // messageBroker = new MessageBroker(this, hub);
-        // Document document = hub.get(Document);
+        try {
+            messageBroker = new MessageBroker(hub);
+        } catch (Exception e) {
+            LOGGER.error("Could not create DBUS mesage broker: {}", e.getMessage(), e);
+        }
         
         LanguageSelector selector = new LanguageSelector(hub);
         language = selector.selectForFilePath(this.filePath);
@@ -134,21 +138,20 @@ public class Application {
         LOGGER.info("Read %d bytes".formatted(fileContent.length()));
         
         syntaxTree = null;
-        highlighter = null;
         if (language != null) {
-            // Object parseResult = language.parse(fileContent, null, null);
-            // syntaxTree = parseResult.syntaxTree();
-            // tokens = parseResult.tokens();
+            Language.ParseResult parseResult = language.parse(fileContent, null, null, null);
+            syntaxTree = parseResult.previousAST();
+            tokens = parseResult.previousTokens();
         }
         
-        // versioning = versioningSelector.selectVersioningFor(filePath)
+        versioning = versioningSelector.selectVersioningFor(filePath);
         
         projectIndex = null;
         if (versioning != null) {
             // projectIndex = new ProjectIndex(versioning.metaFolder() + "/einsicht.db");
         }
         
-        hashOnDisk = bytesToHex(sha256.digest(fileContent.getBytes(StandardCharsets.UTF_8)));
+        hashOnDisk = md5(fileContent);
         lengthOnDisk = fileContent.length();
         
         // document.setPlainText(filePath);
@@ -158,7 +161,17 @@ public class Application {
     }
     
     public void saveFile() {
-    
+        try {
+            if (syntaxTree != null) {
+                fileContent = syntaxTree.reconstructCode();
+            }
+            Files.writeString(filePath, fileContent);
+            updateProjectIndex();
+            hashOnDisk = md5(fileContent);
+            lengthOnDisk = fileContent.length();
+        } catch (IOException exception) {
+            LOGGER.error("Error saving file to disk: {}", exception.getMessage(), exception);
+        }
     }
     
     public void saveFileAs(Path filePath) {
@@ -169,8 +182,7 @@ public class Application {
         if (fileContent.length() != lengthOnDisk) {
             return true;
         }
-        String textHash = bytesToHex(sha256.digest(fileContent.getBytes(StandardCharsets.UTF_8)));
-        return !textHash.equals(hashOnDisk);
+        return !md5(fileContent).equals(hashOnDisk);
     }
     
     public Path filePath() {
@@ -230,6 +242,10 @@ public class Application {
     
     public String baseDir() {
         return "";
+    }
+
+    public static String md5(String input) {
+        return bytesToHex(sha256.digest(input.getBytes(StandardCharsets.UTF_8)));
     }
     
     private static String bytesToHex(byte[] hash) {

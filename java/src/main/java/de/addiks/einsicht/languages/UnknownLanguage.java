@@ -1,13 +1,13 @@
 package de.addiks.einsicht.languages;
 
 import de.addiks.einsicht.Hub;
-import de.addiks.einsicht.languages.abstract_syntax_tree.ASTNode;
-import de.addiks.einsicht.languages.abstract_syntax_tree.patterns.NodeBranch;
-import de.addiks.einsicht.languages.abstract_syntax_tree.patterns.NodePattern;
-import de.addiks.einsicht.languages.abstract_syntax_tree.patterns.TokenNodePattern;
-import de.addiks.einsicht.languages.semantics.Semantic;
-import de.addiks.einsicht.languages.tokens.TokenMatcher;
-import de.addiks.einsicht.languages.tokens.matchers.RegexMatcher;
+import de.addiks.einsicht.abstract_syntax_tree.ASTNode;
+import de.addiks.einsicht.abstract_syntax_tree.patterns.NodeBranch;
+import de.addiks.einsicht.abstract_syntax_tree.patterns.NodePattern;
+import de.addiks.einsicht.abstract_syntax_tree.patterns.TokenNodePattern;
+import de.addiks.einsicht.semantics.Semantic;
+import de.addiks.einsicht.tokens.TokenMatcher;
+import de.addiks.einsicht.tokens.matchers.RegexMatcher;
 
 import java.util.List;
 import java.util.Map;

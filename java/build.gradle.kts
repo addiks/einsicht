@@ -25,6 +25,7 @@ dependencies {
 
     // Use JUnit Jupiter for testing.
     testImplementation(libs.junit.jupiter)
+    testImplementation("org.mockito:mockito-core:5.+")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 

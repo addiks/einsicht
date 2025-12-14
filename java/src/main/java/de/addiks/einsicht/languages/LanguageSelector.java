@@ -22,6 +22,7 @@ public class LanguageSelector {
         String mimeType = Files.probeContentType(filePath);
         if (mimeType != null) {
             if (mimeType.equals("text/x-python")) {
+                language = new PythonLanguage(hub);
 
             } else if (mimeType.equals("application/x-python-code")) {
                 // Python bytecode
@@ -39,7 +40,7 @@ public class LanguageSelector {
             if (filePath.endsWith(".md")) {
 
             } else if (filePath.endsWith(".java")) {
-
+                language = new JavaLanguage(hub);
             }
         }
 
@@ -48,6 +49,7 @@ public class LanguageSelector {
             language = new UnknownLanguage(hub);
         }
 
+        log.info("Determined language of '{}' to be {}.", filePath, language.name());
         return language;
     }
 

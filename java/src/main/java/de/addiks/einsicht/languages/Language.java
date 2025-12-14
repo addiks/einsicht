@@ -1,15 +1,15 @@
 package de.addiks.einsicht.languages;
 
 import de.addiks.einsicht.Hub;
-import de.addiks.einsicht.languages.abstract_syntax_tree.ASTBranch;
-import de.addiks.einsicht.languages.abstract_syntax_tree.ASTNode;
-import de.addiks.einsicht.languages.abstract_syntax_tree.ASTRoot;
-import de.addiks.einsicht.languages.abstract_syntax_tree.patterns.NodePattern;
-import de.addiks.einsicht.languages.semantics.Semantic;
-import de.addiks.einsicht.languages.tokens.ConsumableString;
-import de.addiks.einsicht.languages.tokens.Token;
-import de.addiks.einsicht.languages.tokens.TokenDef;
-import de.addiks.einsicht.languages.tokens.TokenMatcher;
+import de.addiks.einsicht.abstract_syntax_tree.ASTBranch;
+import de.addiks.einsicht.abstract_syntax_tree.ASTNode;
+import de.addiks.einsicht.abstract_syntax_tree.ASTRoot;
+import de.addiks.einsicht.abstract_syntax_tree.patterns.NodePattern;
+import de.addiks.einsicht.semantics.Semantic;
+import de.addiks.einsicht.tokens.ConsumableString;
+import de.addiks.einsicht.tokens.Token;
+import de.addiks.einsicht.tokens.TokenDef;
+import de.addiks.einsicht.tokens.TokenMatcher;
 import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.Nullable;
 
@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 public abstract class Language {
     private static final MessageDigest md5;
@@ -52,6 +51,8 @@ public abstract class Language {
 
     public abstract List<TokenMatcher> tokenMatchers();
 
+    public abstract boolean isNodeRelevantForGrammar(ASTNode node);
+
     public abstract List<NodePattern> grammar();
 
     public abstract Map<String, Semantic.Factory> semantics();
@@ -61,8 +62,6 @@ public abstract class Language {
     }
 
     public abstract Object stylesheet();
-
-    public abstract boolean isNodeRelevantForGrammar(ASTNode node);
 
     public ParseResult parse(String code, Path filepath, @Nullable ASTRoot previousAST, @Nullable List<Token> previousTokens) {
         String hash = new String(md5.digest(code.getBytes(StandardCharsets.UTF_8)));
@@ -81,29 +80,7 @@ public abstract class Language {
                 }
 
                 ASTRoot ast = new ASTRoot(nodes, filepath);
-
-                Map<String, Semantic.Factory> semanticFactories = semantics();
-                Map<Class<? extends Semantic>, List<Semantic>> semantics = new HashMap<>();
-                Map<Class<? extends Semantic>, Semantic.Factory> contextualFactories = new HashMap<>();
-                for (Semantic.Factory factory : semanticFactories.values()) {
-                    if (factory instanceof Semantic.Factory.Contextual contextualFactory) {
-                        contextualFactories.put(contextualFactory.root(), contextualFactory);
-                    }
-                }
-                ast.iterate(node -> {
-                    String key = node.grammarKey();
-                    if (semanticFactories.containsKey(key)
-                            && node instanceof ASTBranch branch
-                            && semanticFactories.get(key) instanceof Semantic.Factory.Local localFactory) {
-                        Semantic.Local semantic = localFactory.forBranch(branch);
-                        branch.assignSemantic(semantic);
-                        if (contextualFactories.containsKey(semantic.getClass())) {
-                            Semantic.Factory.Contextual contextualFactory = contextualFactories.get(semantic.getClass());
-
-                            contextualFactory.combine(semantic, ...);
-                        }
-                    }
-                });
+                addSemanticsTo(ast);
 
                 hub.register(ast);
 
@@ -117,6 +94,55 @@ public abstract class Language {
             @Nullable ASTRoot previousAST,
             List<ASTNode> previousTokens
     ) {}
+
+    private void addSemanticsTo(ASTRoot ast) {
+
+        // Preparations
+        Map<String, Semantic.Factory> semanticFactories = semantics();
+        Map<Class<? extends Semantic>, List<Semantic>> semantics = new HashMap<>();
+        Map<Class<? extends Semantic>, Semantic.Factory.Contextual> contextualFactories = new HashMap<>();
+        for (Semantic.Factory factory : semanticFactories.values()) {
+            if (factory instanceof Semantic.Factory.Contextual contextualFactory) {
+                contextualFactories.put(contextualFactory.root(), contextualFactory);
+            }
+        }
+
+        // Determine local (per-node) semantics
+        ast.iterate(node -> {
+            String key = node.grammarKey();
+            if (semanticFactories.containsKey(key)
+                    && node instanceof ASTBranch branch
+                    && semanticFactories.get(key) instanceof Semantic.Factory.Local localFactory) {
+                Semantic.Local semantic = localFactory.forBranch(branch);
+                branch.assignSemantic(semantic);
+                semantics.computeIfAbsent(semantic.getClass(), c -> new ArrayList<>()).add(semantic);
+            }
+        });
+
+        // Combine local semantics into contextual semantics
+        for (List<Semantic> semanticsForClass : semantics.values()) {
+            for (Semantic semantic : semanticsForClass) {
+
+                if (contextualFactories.containsKey(semantic.getClass())) {
+                    Semantic.Factory.Contextual contextualFactory = contextualFactories.get(semantic.getClass());
+
+                    List<Semantic> related = new ArrayList<>();
+                    for (Class<? extends Semantic> relatedClass : contextualFactory.related()) {
+                        for (Semantic possiblyRelated : semantics.get(relatedClass)) {
+                            if (contextualFactory.isRelatedTo(semantic, possiblyRelated)) {
+                                related.add(possiblyRelated);
+                            }
+                        }
+                    }
+
+                    Semantic.Contextual contextual = contextualFactory.combine(semantic, related);
+
+
+                }
+            }
+        }
+
+    }
 
     private List<ASTNode> applyGrammar(List<ASTNode> nodes, Map<String, List<NodePattern>> grammar) {
         Map<String, List<ASTNode>> nodeMap = mapNodes(nodes);

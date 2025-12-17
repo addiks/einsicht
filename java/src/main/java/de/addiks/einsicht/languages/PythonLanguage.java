@@ -201,7 +201,7 @@ public class PythonLanguage extends Language {
         ));
 
         semantics.put("function", new FunctionHead.Factory(
-                ASTSelector.of("function")
+                ASTSelector.of("function/identifier")
         ));
 
         return semantics;

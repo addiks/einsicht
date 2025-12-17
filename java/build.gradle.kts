@@ -8,6 +8,7 @@
 plugins {
     // Apply the application plugin to add support for building a CLI application in Java.
     application
+    id("org.openjfx.javafxplugin") version "0.1.0"
 }
 
 repositories {
@@ -43,6 +44,10 @@ java {
 application {
     // Define the main class for the application.
     mainClass = "de.addiks.passwordtrainer.Application"
+}
+
+javafx {
+    modules("javafx.controls", "javafx.fxml")
 }
 
 tasks.named<Test>("test") {

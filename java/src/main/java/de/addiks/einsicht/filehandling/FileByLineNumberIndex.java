@@ -1,12 +1,10 @@
-package de.addiks.einsicht.file_handling;
+package de.addiks.einsicht.filehandling;
 
 import org.jspecify.annotations.Nullable;
 
 import java.io.*;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * An in-memory index to quickly find the position for a line-number in a huge file.
@@ -17,6 +15,7 @@ public class FileByLineNumberIndex {
     private final File file;
     private final List<Milestone> milestones = new ArrayList<>();
     private final int lastLine;
+    private final long lastOffset;
     private final int milestoneSize;
 
     private record Milestone(int line, long offset) {}
@@ -70,14 +69,51 @@ public class FileByLineNumberIndex {
                         }
                     }
                 }
-                offset += BUFFER_SIZE;
+                offset += bytesRead;
             }
             lastLine = lineNumber;
+            lastOffset = end;
         }
     }
 
+    public long offsetAtLine(int line) throws IOException {
+        if (lastUsedInnerIndex != null && lastUsedInnerIndex.containsLine(line)) {
+            return lastUsedInnerIndex.offsetAtLine(line);
+        }
+        Milestone previousMilestone = milestones.getFirst();
+        for (Milestone milestone : milestones) {
+            if (milestone == previousMilestone) {
+                continue;
+            }
+            if (milestone.line == line) {
+                return milestone.offset;
+            } else if (milestone.line > line) {
+                if (milestone.line - line < 100) {
+                    return searchOffsetLinearlyIn(
+                            file,
+                            previousMilestone.offset,
+                            milestone.offset,
+                            previousMilestone.line,
+                            line
+                    );
+                } else {
+                    lastUsedInnerIndex = new FileByLineNumberIndex(
+                            file,
+                            milestoneSize,
+                            previousMilestone.line,
+                            previousMilestone.offset,
+                            milestone.offset
+                    );
+                    return lastUsedInnerIndex.offsetAtLine(line);
+                }
+            }
+            previousMilestone = milestone;
+        }
+        return lastOffset;
+    }
+
     public int lineAtOffset(long offset) throws IOException {
-        if (lastUsedInnerIndex != null && lastUsedInnerIndex.contains(offset)) {
+        if (lastUsedInnerIndex != null && lastUsedInnerIndex.containsOffset(offset)) {
             return lastUsedInnerIndex.lineAtOffset(offset);
         }
         Milestone previousMilestone = milestones.getFirst();
@@ -112,7 +148,7 @@ public class FileByLineNumberIndex {
         return lastLine;
     }
 
-    private boolean contains(long offset) {
+    private boolean containsOffset(long offset) {
         return offset >= firstOffset() && offset <= lastOffset();
     }
 
@@ -121,7 +157,47 @@ public class FileByLineNumberIndex {
     }
 
     private long lastOffset() {
-        return milestones.getLast().offset;
+        return lastOffset;
+    }
+
+    public boolean containsLine(int line) {
+        return line >= firstLine() && line <= lastLine();
+    }
+
+    public int firstLine() {
+        return milestones.getFirst().line;
+    }
+
+    public int lastLine() {
+        return lastLine;
+    }
+
+    private static long searchOffsetLinearlyIn(
+            File file,
+            long beginOffset,
+            long endOffset,
+            int firstLineNumber,
+            int targetLine
+    ) throws IOException {
+        try (RandomAccessFile handle = new RandomAccessFile(file, "r")) {
+            int lineNumber = firstLineNumber;
+            byte[] buffer = new byte[BUFFER_SIZE];
+            long offset = beginOffset;
+            while (handle.getFilePointer() < endOffset) {
+                int bytesRead = handle.read(buffer, 0, BUFFER_SIZE);
+                for (int i = 0; i < bytesRead; i++) {
+                    // 10 = line feed
+                    if (10 == (int) buffer[i]) {
+                        lineNumber++;
+                    }
+                    if (lineNumber == targetLine) {
+                        return offset+i;
+                    }
+                }
+                offset += bytesRead;
+            }
+            return offset;
+        }
     }
 
     private static int searchLineNumberLinearlyIn(
@@ -146,7 +222,7 @@ public class FileByLineNumberIndex {
                         return lineNumber;
                     }
                 }
-                offset += BUFFER_SIZE;
+                offset += bytesRead;
             }
             return lineNumber;
         }

@@ -1,6 +1,7 @@
 package de.addiks.einsicht.abstract_syntax_tree;
 
 import de.addiks.einsicht.semantics.Semantic;
+import de.addiks.einsicht.tokens.Token;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -68,6 +69,26 @@ public class ASTBranch extends ASTNode {
             if (index >= 0) {
                 return child(index);
             }
+        }
+        return null;
+    }
+
+    public @Nullable Token firstToken() {
+        ASTNode first = firstChild();
+        if (first instanceof Token token) {
+            return token;
+        } else if (first instanceof ASTBranch firstBranch) {
+            return firstBranch.firstToken();
+        }
+        return null;
+    }
+
+    public @Nullable Token lastToken() {
+        ASTNode last = lastChild();
+        if (last instanceof Token token) {
+            return token;
+        } else if (last instanceof ASTBranch lastBranch) {
+            return lastBranch.lastToken();
         }
         return null;
     }

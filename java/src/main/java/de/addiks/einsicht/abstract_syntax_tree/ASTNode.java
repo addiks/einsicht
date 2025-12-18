@@ -229,6 +229,24 @@ public class ASTNode {
         return null;
     }
 
+    public @Nullable ASTNode firstChild() {
+        if (!prepended.isEmpty()) {
+            return prepended.getFirst();
+        } else if (!children.isEmpty()) {
+            return children.getFirst();
+        }
+        return null;
+    }
+
+    public @Nullable ASTNode lastChild() {
+        if (!appended.isEmpty()) {
+            return appended.getLast();
+        } else if (!children.isEmpty()) {
+            return children.getLast();
+        }
+        return null;
+    }
+
     public Language getLanguage() {
         return language;
     }

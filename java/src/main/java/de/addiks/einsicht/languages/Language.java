@@ -63,10 +63,15 @@ public abstract class Language {
 
     public abstract Object stylesheet();
 
-    public ParseResult parse(String code, Path filepath, @Nullable ASTRoot previousAST, @Nullable List<Token> previousTokens) {
+    public ParseResult parse(
+            String code,
+            Path filepath,
+            @Nullable Token preceeding,
+            @Nullable Token following
+    ) {
         String hash = new String(md5.digest(code.getBytes(StandardCharsets.UTF_8)));
         if (!parseCache.containsKey(hash)) {
-            List<ASTNode> tokens = lex(code, previousTokens);
+            List<ASTNode> tokens = lex(code, preceeding, following);
             if (!tokens.isEmpty()) {
                 Map<String, List<NodePattern>> grammar = grammarMap();
 
@@ -246,7 +251,11 @@ public abstract class Language {
         }
     }
 
-    public List<ASTNode> lex(String code, @Nullable List<Token> previousTokens) {
+    public List<ASTNode> lex(
+            String code,
+            @Nullable Token preceeding,
+            @Nullable Token following
+    ) {
         String hash = new String(md5.digest(code.getBytes(StandardCharsets.UTF_8)));
         if (!lexCache.containsKey(hash)) {
             List<ASTNode> tokens = new ArrayList<>();

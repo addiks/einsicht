@@ -33,7 +33,10 @@ public class VariableDeclaration implements Semantic.Local {
 
         @Override
         public Semantic.Local forBranch(ASTBranch branch) {
-            return new VariableDeclaration(branch, ASTNode.reconstructCode(nameSelector.selectIn(branch)));
+            return new VariableDeclaration(branch, ASTNode.reconstructCode(
+                    nameSelector.selectIn(branch),
+                    branch.newStringBuilder()
+            ));
         }
     }
 }

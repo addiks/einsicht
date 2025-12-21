@@ -7,23 +7,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class CodeBlock extends ASTNode {
-    private final Map<ASTNode, Integer> childToIndex = new HashMap<>();
+public class CodeBlock extends ASTBranch {
 
     public CodeBlock(
-            Language language,
-            int row,
-            int col,
-            int offset,
-            @Nullable ASTNode parent
+            List<ASTNode> children
     ) {
-        super(language, "", row, col, offset, "block", parent, List.of());
+        super(children, "block");
     }
 
-    public void addStatement(ASTNode statement) {
-        childToIndex.put(statement, children.size());
-        children.add(statement);
-        statement.setParent(this);
-        code += statement.reconstructCode();
-    }
 }

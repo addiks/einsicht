@@ -1,7 +1,7 @@
 package de.addiks.einsicht.abstract_syntax_tree.patterns;
 
 import de.addiks.einsicht.abstract_syntax_tree.ASTNode;
-import de.addiks.einsicht.tokens.Token;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.Token;
 
 import java.util.List;
 import java.util.Set;

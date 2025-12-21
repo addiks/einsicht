@@ -7,12 +7,12 @@ import de.addiks.einsicht.abstract_syntax_tree.selectors.ASTSelector;
 import de.addiks.einsicht.semantics.ClassHead;
 import de.addiks.einsicht.semantics.FunctionHead;
 import de.addiks.einsicht.semantics.Semantic;
-import de.addiks.einsicht.tokens.Token;
-import de.addiks.einsicht.tokens.TokenMatcher;
-import de.addiks.einsicht.tokens.matchers.DirectTokenMatcher;
-import de.addiks.einsicht.tokens.matchers.KeywordsTokenMatcher;
-import de.addiks.einsicht.tokens.matchers.LiteralTokenMatcher;
-import de.addiks.einsicht.tokens.matchers.RegexMatcher;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.Token;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.TokenMatcher;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.matchers.DirectTokenMatcher;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.matchers.KeywordsTokenMatcher;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.matchers.LiteralTokenMatcher;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.matchers.RegexMatcher;
 
 import java.util.HashMap;
 import java.util.List;

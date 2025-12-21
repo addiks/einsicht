@@ -23,6 +23,7 @@ dependencies {
     implementation("de.bwaldvogel:log4j-systemd-journal-appender:2.6.0")
     implementation("com.github.hypfvieh:dbus-java-core:5.1.1")
     implementation("com.github.hypfvieh:dbus-java-transport-jnr-unixsocket:5.1.1")
+    implementation("com.sigpwned:chardet4j:77.1.0")
 
     // Use JUnit Jupiter for testing.
     testImplementation(libs.junit.jupiter)

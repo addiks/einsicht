@@ -139,9 +139,9 @@ public class Application {
         
         syntaxTree = null;
         if (language != null) {
-            Language.ParseResult parseResult = language.parse(fileContent, null, null, null);
-            syntaxTree = parseResult.previousAST();
-            tokens = parseResult.previousTokens();
+          //  Language.ParseResult parseResult = language.parse(fileContent, null, null, null);
+          //  syntaxTree = parseResult.previousAST();
+          //  tokens = parseResult.previousTokens();
         }
         
         versioning = versioningSelector.selectVersioningFor(filePath);
@@ -162,9 +162,9 @@ public class Application {
     
     public void saveFile() {
         try {
-            if (syntaxTree != null) {
-                fileContent = syntaxTree.reconstructCode();
-            }
+         //   if (syntaxTree != null) {
+         //       fileContent = syntaxTree.reconstructCode();
+         //   }
             Files.writeString(filePath, fileContent);
             updateProjectIndex();
             hashOnDisk = md5(fileContent);

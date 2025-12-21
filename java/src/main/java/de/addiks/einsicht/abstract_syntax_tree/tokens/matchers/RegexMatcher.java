@@ -1,8 +1,8 @@
-package de.addiks.einsicht.tokens.matchers;
+package de.addiks.einsicht.abstract_syntax_tree.tokens.matchers;
 
-import de.addiks.einsicht.tokens.ConsumableString;
-import de.addiks.einsicht.tokens.TokenDef;
-import de.addiks.einsicht.tokens.TokenMatcher;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.ConsumableString;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.TokenDef;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.TokenMatcher;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

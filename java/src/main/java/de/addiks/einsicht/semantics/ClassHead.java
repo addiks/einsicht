@@ -40,7 +40,10 @@ public class ClassHead implements Semantic.Local {
         public Semantic.Local forBranch(ASTBranch branch) {
             return new ClassHead(
                     branch,
-                    ASTNode.reconstructCode(nameSelector.selectIn(branch))
+                    ASTNode.reconstructCode(
+                            nameSelector.selectIn(branch),
+                            branch.newStringBuilder()
+                    )
             );
         }
     }

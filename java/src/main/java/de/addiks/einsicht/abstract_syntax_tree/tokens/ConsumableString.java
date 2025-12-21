@@ -1,16 +1,18 @@
-package de.addiks.einsicht.tokens;
+package de.addiks.einsicht.abstract_syntax_tree.tokens;
+
+import de.addiks.einsicht.filehandling.codings.MappedString;
 
 public class ConsumableString {
-    private final String text;
+    private final MappedString text;
     private final int length;
     private int position = 0;
 
-    public ConsumableString(String string) {
+    public ConsumableString(MappedString string) {
         this.text = string;
         this.length = string.length();
     }
 
-    public String get() {
+    public MappedString get() {
         return text.substring(position);
     }
 
@@ -22,11 +24,11 @@ public class ConsumableString {
         return get().startsWith(prefix);
     }
 
-    public String substring(int begin) {
+    public MappedString substring(int begin) {
         return get().substring(begin);
     }
 
-    public String substring(int begin, int end) {
+    public MappedString substring(int begin, int end) {
         return get().substring(begin, end);
     }
 
@@ -34,18 +36,18 @@ public class ConsumableString {
         return length - position;
     }
 
-    public String consume(int length) {
+    public MappedString consume(int length) {
         position += length;
         return text.substring(position - length, position);
     }
 
-    public String consume(String toConsume) {
+    public MappedString consume(String toConsume) {
         int toConsumeLength = toConsume.length();
         assert toConsume.equals(substring(0, toConsumeLength));
         return consume(toConsumeLength);
     }
 
-    public String consumed(int lengthBack) {
+    public MappedString consumed(int lengthBack) {
         return text.substring(position - lengthBack, lengthBack);
     }
 }

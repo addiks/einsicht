@@ -33,7 +33,10 @@ public class FunctionHead implements Semantic.Local {
 
         @Override
         public Semantic.Local forBranch(ASTBranch branch) {
-            return new FunctionHead(branch, ASTNode.reconstructCode(nameSelector.selectIn(branch)));
+            return new FunctionHead(branch, ASTNode.reconstructCode(
+                    nameSelector.selectIn(branch),
+                    branch.newStringBuilder()
+            ));
         }
     }
 }

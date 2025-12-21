@@ -1,7 +1,8 @@
 package de.addiks.einsicht.abstract_syntax_tree;
 
+import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.semantics.Semantic;
-import de.addiks.einsicht.tokens.Token;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.Token;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -13,10 +14,7 @@ public class ASTBranch extends ASTNode {
     private final Map<ASTNode, Integer> childToIndex;
     private final Map<Class<? extends Semantic>, Semantic> semantics = new HashMap<>();
 
-    public ASTBranch(
-            List<ASTNode> children,
-            String grammarKey
-    ) {
+    public ASTBranch(List<ASTNode> children, String grammarKey) {
         this(children, grammarKey, null);
     }
 
@@ -25,10 +23,11 @@ public class ASTBranch extends ASTNode {
             String grammarKey,
             @Nullable ASTBranch parent
     ) {
-        super(children.getFirst(), codeOf(children), grammarKey, parent, children);
+        super(children.getFirst(), grammarKey, parent, children);
         childToIndex = new HashMap<>();
         int index = 0;
         for (ASTNode child : children) {
+            child.setParent(this);
             childToIndex.put(child, index);
             index++;
         }
@@ -49,6 +48,24 @@ public class ASTBranch extends ASTNode {
     public void assignSemantic(Semantic semantic) {
         assert !semantics.containsKey(semantic.getClass());
         semantics.put(semantic.getClass(), semantic);
+    }
+
+    @Override
+    public MappedString.Builder newStringBuilder() {
+        return firstToken().newStringBuilder();
+    }
+
+    @Override
+    public void reconstructCode(MappedString.Builder codeBuilder) {
+        for (ASTNode prepended : getPrepended()) {
+            prepended.reconstructCode(codeBuilder);
+        }
+        for (ASTNode child : getChildren()) {
+            child.reconstructCode(codeBuilder);
+        }
+        for (ASTNode appended : getAppended()) {
+            appended.reconstructCode(codeBuilder);
+        }
     }
 
     @Override
@@ -91,14 +108,6 @@ public class ASTBranch extends ASTNode {
             return lastBranch.lastToken();
         }
         return null;
-    }
-
-    private static String codeOf(List<ASTNode> nodes) {
-        StringBuilder code = new StringBuilder();
-        for (ASTNode child : nodes) {
-            child.reconstructCode(code);
-        }
-        return code.toString();
     }
 
 }

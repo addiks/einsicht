@@ -1,6 +1,8 @@
 package de.addiks.einsicht.abstract_syntax_tree;
 
 import de.addiks.einsicht.abstract_syntax_tree.selectors.ASTSelector;
+import de.addiks.einsicht.filehandling.codings.DecodedCharacter;
+import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.languages.Language;
 import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NonNull;
@@ -15,15 +17,15 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 
-public class ASTNode {
+public abstract class ASTNode {
     private final Language language;
-    protected String code;
+    private boolean dirty = false;
     private final int row;
     private @Nullable Integer lastRow = null;
     private final int col;
-    private final int offset;
+    private final long offset;
     private final String grammarKey;
-    private @Nullable ASTNode parent;
+    private @Nullable ASTBranch parent;
     protected final List<ASTNode> children = new ArrayList<>();
     private final Map<String, String> attributes = new HashMap<>();
     private final List<ASTNode> prepended = new ArrayList<>();
@@ -31,46 +33,40 @@ public class ASTNode {
 
     public ASTNode(
             Language language,
-            String code,
             int row,
             int col,
             int offset,
             String grammarKey
     ) {
-        this(language, code, row, col, offset, grammarKey, null, List.of());
+        this(language, row, col, offset, grammarKey, null, List.of());
     }
 
     public ASTNode(
             Language language,
-            String code,
             int row,
             int col,
-            int offset,
+            long offset,
             String grammarKey,
-            @Nullable ASTNode parent,
+            @Nullable ASTBranch parent,
             List<ASTNode> children
     ) {
         this.language = language;
-        this.code = code;
         this.row = row;
         this.col = col;
         this.offset = offset;
         this.grammarKey = grammarKey;
         this.parent = parent;
         this.children.addAll(children);
-        children.forEach(c -> c.setParent(this));
     }
 
     protected ASTNode(
         ASTNode example,
-        String code,
         String grammarKey,
-        @Nullable ASTNode parent,
+        @Nullable ASTBranch parent,
         List<ASTNode> children
     ) {
         this(
                 example.getLanguage(),
-                code,
                 example.getRow(),
                 example.getCol(),
                 example.getOffset(),
@@ -86,7 +82,7 @@ public class ASTNode {
 
     public int lastRow() {
         if (lastRow == null) {
-            lastRow = row + StringUtils.countMatches(code, "\n");
+            lastRow = row + getCode().substringCount("\n");
         }
         return lastRow;
     }
@@ -99,28 +95,25 @@ public class ASTNode {
         appended.add(node);
     }
 
-    public String reconstructCode() {
-        StringBuilder codeBuilder = new StringBuilder();
-        reconstructCode(codeBuilder);
+    public abstract MappedString.Builder newStringBuilder();
+
+    public MappedString reconstructCode() {
+        MappedString.Builder builder = newStringBuilder();
+        reconstructCode(builder);
+        return builder.build();
+    }
+
+    public abstract void reconstructCode(MappedString.Builder codeBuilder);
+
+    public static String reconstructCode(List<ASTNode> nodes, MappedString.Builder codeBuilder) {
+        for (ASTNode node : nodes) {
+            node.reconstructCode(codeBuilder);
+        }
         return codeBuilder.toString();
     }
 
-    public void reconstructCode(StringBuilder codeBuilder) {
-        for (ASTNode predecessor : prepended) {
-            predecessor.reconstructCode(codeBuilder);
-        }
-        codeBuilder.append(code);
-        for (ASTNode successor : appended) {
-            successor.reconstructCode(codeBuilder);
-        }
-    }
-
-    public static String reconstructCode(List<ASTNode> nodes) {
-        StringBuilder code = new StringBuilder();
-        for (ASTNode node : nodes) {
-            node.reconstructCode(code);
-        }
-        return code.toString();
+    public boolean isDirty() {
+        return dirty;
     }
 
     public ASTNode child(int index) {
@@ -186,7 +179,7 @@ public class ASTNode {
         if (this.offset > offset) {
             return false;
         }
-        return this.offset + code.length() > offset;
+        return this.offset + getCode().length() > offset;
     }
 
     public boolean hasParentWith(Selector selector) {
@@ -251,8 +244,9 @@ public class ASTNode {
         return language;
     }
 
-    public String getCode() {
-        return code;
+    public MappedString getCode() {
+        // TODO: Some caching here?
+        return reconstructCode();
     }
 
     public int getRow() {
@@ -267,7 +261,7 @@ public class ASTNode {
         return col;
     }
 
-    public int getOffset() {
+    public long getOffset() {
         return offset;
     }
 
@@ -279,7 +273,7 @@ public class ASTNode {
         return parent;
     }
 
-    public void setParent(ASTNode parent) {
+    public void setParent(@Nullable ASTBranch parent) {
         this.parent = parent;
     }
 

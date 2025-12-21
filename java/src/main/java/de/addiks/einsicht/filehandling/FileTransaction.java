@@ -1,13 +1,18 @@
 package de.addiks.einsicht.filehandling;
 
-import org.apache.logging.log4j.core.util.ExecutorServices;
+import com.sigpwned.chardet4j.Chardet;
+import de.addiks.einsicht.filehandling.codings.BinaryString;
+import de.addiks.einsicht.filehandling.codings.DecodedString;
+import de.addiks.einsicht.filehandling.codings.MappedString;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -15,13 +20,15 @@ public class FileTransaction {
     private static final Logger log = LoggerFactory.getLogger(FileTransaction.class);
     private final File file;
     private final Partition.Factory partitionFactory;
-    private final List<DirtyArea> dirtyAreas = new ArrayList<>();
+    private final List<PartitionAtArea> partitions = new ArrayList<>();
     private final ScheduledExecutorService accessCloser = Executors.newSingleThreadScheduledExecutor();
     private final ReentrantLock lock = new ReentrantLock();
 
     private @Nullable RandomAccessFile readAccess = null;
     private @Nullable RandomAccessFile writeAccess = null;
     private @Nullable ScheduledFuture<?> accessCloseFuture = null;
+    private @Nullable Charset charset = null;
+    private boolean wasDetectedAsBinary = false;
 
     public FileTransaction(File file, Partition.Factory partitionFactory) {
         this.file = file;
@@ -30,15 +37,15 @@ public class FileTransaction {
 
     public interface Partition {
         boolean modified();
-        byte[] currentContent();
-        void resetTo(byte[] content);
+        MappedString currentContent();
+        void resetTo(MappedString content) throws IOException;
 
         interface Factory {
             Partition create(
-                    byte[] originalContent,
-                    @Nullable Partition preceedingPartition,
-                    @Nullable Partition followingPartition
-            );
+                    MappedString dataInPartition,
+                    long startingOffset
+            ) throws IOException;
+            Partition combine(Partition preceedingPartition, Partition followingPartition);
         }
     }
 
@@ -50,45 +57,47 @@ public class FileTransaction {
         while (!notCoveredAreas.isEmpty()) {
             Area areaToCover = notCoveredAreas.removeFirst();
 
-            for (DirtyArea dirtyArea : dirtyAreas) {
-                if (dirtyArea.area.containsWholly(areaToCover)) {
-                    partitions.add(dirtyArea.partition);
+            for (PartitionAtArea partitionAtArea : this.partitions) {
+                if (partitionAtArea.area.containsWholly(areaToCover)) {
+                    partitions.add(partitionAtArea.partition);
 
-                } else if (dirtyArea.area.overlaps(areaToCover)) {
-                    partitions.add(dirtyArea.partition);
-                    notCoveredAreas.addAll(areaToCover.cut(dirtyArea.area));
+                } else if (partitionAtArea.area.overlaps(areaToCover)) {
+                    partitions.add(partitionAtArea.partition);
+                    notCoveredAreas.addAll(areaToCover.cut(partitionAtArea.area));
                 }
             }
 
             Partition newPartition = partitionFactory.create(
                     readData(areaToCover),
-                    partitionDirectlyBefore(areaToCover.offset),
-                    partitionDirectlyAfter(areaToCover.end())
+                    areaToCover.offset
             );
+
+            // TODO: Merge Partitions
+
             partitions.add(newPartition);
-            dirtyAreas.add(new DirtyArea(newPartition, areaToCover));
+            this.partitions.add(new PartitionAtArea(newPartition, areaToCover));
         }
 
         return partitions;
     }
 
     public void commit() throws IOException {
-        for (DirtyArea dirtyArea : dirtyAreas) {
-            if (dirtyArea.partition.modified()) {
-                writeData(dirtyArea.area, dirtyArea.partition.currentContent());
+        for (PartitionAtArea partitionAtArea : partitions) {
+            if (partitionAtArea.partition.modified()) {
+                writeData(partitionAtArea.area, partitionAtArea.partition.currentContent());
             }
         }
     }
 
     public void rollback() throws IOException {
-        for (DirtyArea dirtyArea : dirtyAreas) {
-            if (dirtyArea.partition.modified()) {
-                dirtyArea.partition.resetTo(readData(dirtyArea.area));
+        for (PartitionAtArea partitionAtArea : partitions) {
+            if (partitionAtArea.partition.modified()) {
+                partitionAtArea.partition.resetTo(readData(partitionAtArea.area));
             }
         }
     }
 
-    private byte[] readData(Area area) throws IOException {
+    private MappedString readData(Area area) throws IOException {
         lock.lock();
         try {
             cancelCurrentFileAccessClosure();
@@ -99,13 +108,13 @@ public class FileTransaction {
             readAccess.seek(area.offset);
             byte[] buffer = new byte[area.length];
             readAccess.read(buffer, 0, area.length);
-            return buffer;
+            return byteArrayToString(buffer);
         } finally {
             lock.unlock();
         }
     }
 
-    private void writeData(Area area, byte[] data) throws IOException {
+    private void writeData(Area area, MappedString data) throws IOException {
         lock.lock();
         try {
             cancelCurrentFileAccessClosure();
@@ -114,18 +123,49 @@ public class FileTransaction {
                 scheduleFileAccessClosure();
             }
             writeAccess.seek(area.offset);
-            writeAccess.write(data);
+            writeAccess.write(data.toByteArray());
         } finally {
             lock.unlock();
         }
     }
 
-    private @Nullable Partition partitionDirectlyBefore(long offset) {
+    private MappedString byteArrayToString(byte[] data) {
+        if (charset != null) {
+            return new DecodedString(charset, data);
+        } else if (wasDetectedAsBinary) {
+            return new BinaryString(data);
+        } else {
+            Optional<Charset> detectedCharset = Chardet.detectCharset(data);
+            if (detectedCharset.isPresent()) {
+                charset = detectedCharset.get();
+                return new DecodedString(charset, data);
+            } else {
+                wasDetectedAsBinary = true;
+                return new BinaryString(data);
+            }
+        }
+    }
 
+    private @Nullable Partition partitionDirectlyBefore(long offset) {
+        for (PartitionAtArea partitionAtArea : partitions) {
+            if (partitionAtArea.area.end() == offset - 1) {
+                return partitionAtArea.partition;
+            } else if (partitionAtArea.area.offset > offset) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private @Nullable Partition partitionDirectlyAfter(long offset) {
-
+        for (PartitionAtArea partitionAtArea : partitions) {
+            if (partitionAtArea.area.offset == offset + 1) {
+                return partitionAtArea.partition;
+            } else if (partitionAtArea.area.end() > offset) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private void cancelCurrentFileAccessClosure() {
@@ -153,7 +193,7 @@ public class FileTransaction {
         }
     }
 
-    private record DirtyArea(Partition partition, Area area) {}
+    private record PartitionAtArea(Partition partition, Area area) {}
     private record Area(long offset, int length) {
         long end() {
             return offset + length;

@@ -5,15 +5,14 @@ import de.addiks.einsicht.abstract_syntax_tree.ASTBranch;
 import de.addiks.einsicht.abstract_syntax_tree.ASTNode;
 import de.addiks.einsicht.abstract_syntax_tree.ASTRoot;
 import de.addiks.einsicht.abstract_syntax_tree.patterns.NodePattern;
+import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.semantics.Semantic;
-import de.addiks.einsicht.tokens.ConsumableString;
-import de.addiks.einsicht.tokens.Token;
-import de.addiks.einsicht.tokens.TokenDef;
-import de.addiks.einsicht.tokens.TokenMatcher;
-import org.apache.commons.lang3.StringUtils;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.ConsumableString;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.Token;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.TokenDef;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.TokenMatcher;
 import org.jspecify.annotations.Nullable;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -22,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class Language {
     private static final MessageDigest md5;
@@ -64,14 +64,15 @@ public abstract class Language {
     public abstract Object stylesheet();
 
     public ParseResult parse(
-            String code,
+            MappedString code,
             Path filepath,
-            @Nullable Token preceeding,
-            @Nullable Token following
+            int startingRow,
+            int startingColumn,
+            long startingOffset
     ) {
-        String hash = new String(md5.digest(code.getBytes(StandardCharsets.UTF_8)));
+        String hash = new String(md5.digest(code.toByteArray()));
         if (!parseCache.containsKey(hash)) {
-            List<ASTNode> tokens = lex(code, preceeding, following);
+            List<ASTNode> tokens = lex(code, startingRow, startingColumn, startingOffset);
             if (!tokens.isEmpty()) {
                 Map<String, List<NodePattern>> grammar = grammarMap();
 
@@ -177,7 +178,7 @@ public abstract class Language {
                                     nodeMap.remove(replacedNodeKey);
                                 }
 
-                                String code = replacedNode.getCode();
+                                String code = replacedNode.getCode().asString();
                                 if (nodeMap.containsKey(code) && nodeMap.get(code).contains(replacedNode)) {
                                     nodeMap.get(code).remove(replacedNode);
                                     if (nodeMap.get(code).isEmpty()) {
@@ -210,7 +211,7 @@ public abstract class Language {
         for (ASTNode node : nodes) {
             if (node instanceof Token token) {
                 nodeMap.computeIfAbsent(token.tokenName(), t -> new ArrayList<>()).add(token);
-                nodeMap.computeIfAbsent(token.getCode(), t -> new ArrayList<>()).add(token);
+                nodeMap.computeIfAbsent(token.getCode().asString(), t -> new ArrayList<>()).add(token);
             }
         }
         return nodeMap;
@@ -252,20 +253,21 @@ public abstract class Language {
     }
 
     public List<ASTNode> lex(
-            String code,
-            @Nullable Token preceeding,
-            @Nullable Token following
+            MappedString code,
+            int startingRow,
+            int startingColumn,
+            long startingOffset
     ) {
-        String hash = new String(md5.digest(code.getBytes(StandardCharsets.UTF_8)));
+        String hash = new String(md5.digest(code.toByteArray()));
         if (!lexCache.containsKey(hash)) {
             List<ASTNode> tokens = new ArrayList<>();
 
-            AtomicInteger row = new AtomicInteger(1);
-            AtomicInteger col = new AtomicInteger(1);
-            AtomicInteger offset = new AtomicInteger(0);
+            AtomicInteger row = new AtomicInteger(startingRow);
+            AtomicInteger col = new AtomicInteger(startingColumn);
+            AtomicLong offset = new AtomicLong(startingOffset);
 
-            code = code.replaceAll("\r\n", "\n");
-            code = code.replaceAll("\r", "\n");
+        //    code = code.replaceAll("\r\n", "\n");
+        //    code = code.replaceAll("\r", "\n");
 
             ConsumableString consumableCode = new ConsumableString(code);
             List<TokenMatcher> matchers = tokenMatchers();
@@ -283,11 +285,11 @@ public abstract class Language {
                         tokens.add(tokenDef.toToken(this, row.get(), col.get(), offset.get()));
                     }
 
-                    String processedCode = consumableCode.consumed(lengthBefore - consumableCode.length());
+                    MappedString processedCode = consumableCode.consumed(lengthBefore - consumableCode.length());
                     updateRowColOffsetForProcessed(offset, row, col, processedCode);
                 }
                 if (beforeLength == consumableCode.length()) {
-                    String invalidChar = consumableCode.substring(0,1);
+                    MappedString invalidChar = consumableCode.substring(0,1);
                     tokens.add(new Token(
                             this,
                             "T_INVALID",
@@ -306,14 +308,14 @@ public abstract class Language {
     }
 
     private void updateRowColOffsetForProcessed(
-            AtomicInteger offset,
+            AtomicLong offset,
             AtomicInteger row,
             AtomicInteger col,
-            String processedCode
+            MappedString processedCode
     ) {
         int processedLength = processedCode.length();
         offset.set(offset.get() + processedLength);
-        row.set(row.get() + StringUtils.countMatches(processedCode, "\n"));
+        row.set(row.get() + processedCode.substringCount("\n"));
         if (processedCode.contains("\n")) {
             col.set(col.get() + processedLength - processedCode.lastIndexOf("\n"));
         } else {
@@ -345,7 +347,7 @@ public abstract class Language {
         for (ASTNode node : nodes) {
             String nodeDescr = "node: " + node.getGrammarKey();
             if (node instanceof Token token) {
-                nodeDescr = token.tokenName() + " - " + token.getCode().trim();
+                nodeDescr = token.tokenName() + " - " + token.getCode().asString().trim();
             }
             System.out.println(
                     String.format("%1$3s", node.getRow()).replace(' ', '0') +
@@ -353,7 +355,7 @@ public abstract class Language {
                     String.format("%1$" + level + "s", "|") +
                     nodeDescr +
                     ">" +
-                    node.getCode().trim()
+                    node.getCode().asString().trim()
             );
         }
         if (level == 0) {

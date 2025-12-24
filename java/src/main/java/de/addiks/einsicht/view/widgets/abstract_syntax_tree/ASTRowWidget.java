@@ -1,4 +1,4 @@
-package de.addiks.einsicht.widgets.abstract_syntax_tree;
+package de.addiks.einsicht.view.widgets.abstract_syntax_tree;
 
 public class ASTRowWidget {
     private final ASTRowWidgetContainer container;

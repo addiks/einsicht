@@ -33,7 +33,7 @@ public abstract class Language {
         }
     }
 
-    private final Map<String, List<ASTNode>> lexCache = new HashMap<>();
+    private final Map<String, List<Token>> lexCache = new HashMap<>();
     private final Map<String, ParseResult> parseCache = new HashMap<>();
     private final Hub hub;
     private Map<String,List<NodePattern>> grammarMap = null;
@@ -64,6 +64,27 @@ public abstract class Language {
     public abstract Object stylesheet();
 
     public ParseResult parse(
+            List<Token> tokens,
+            Path filepath
+    ) {
+        Map<String, List<NodePattern>> grammar = grammarMap();
+
+        normalize(tokens);
+
+        List<ASTNode> nodes = applyGrammar(tokens, grammar);
+        nodes = groupStatementsIntoBlocks(nodes);
+
+        if (debugEnabled()) {
+            dumpAST(nodes);
+        }
+
+        ASTRoot ast = new ASTRoot(nodes, filepath);
+        addSemanticsTo(ast);
+
+        return new ParseResult(ast, tokens);
+    }
+
+    public ParseResult parse(
             MappedString code,
             Path filepath,
             int startingRow,
@@ -72,33 +93,17 @@ public abstract class Language {
     ) {
         String hash = new String(md5.digest(code.toByteArray()));
         if (!parseCache.containsKey(hash)) {
-            List<ASTNode> tokens = lex(code, startingRow, startingColumn, startingOffset);
+            List<Token> tokens = lex(code, startingRow, startingColumn, startingOffset);
             if (!tokens.isEmpty()) {
-                Map<String, List<NodePattern>> grammar = grammarMap();
-
-                normalize(tokens);
-
-                List<ASTNode> nodes = applyGrammar(tokens, grammar);
-                nodes = groupStatementsIntoBlocks(nodes);
-
-                if (debugEnabled()) {
-                    dumpAST(nodes);
-                }
-
-                ASTRoot ast = new ASTRoot(nodes, filepath);
-                addSemanticsTo(ast);
-
-                hub.register(ast);
-
-                parseCache.put(hash, new ParseResult(ast, tokens));
+                parseCache.put(hash, parse(tokens, filepath));
             }
         }
         return parseCache.getOrDefault(hash, new ParseResult(null, List.of()));
     }
 
     public record ParseResult(
-            @Nullable ASTRoot previousAST,
-            List<ASTNode> previousTokens
+            @Nullable ASTRoot ast,
+            List<Token> tokens
     ) {}
 
     private void addSemanticsTo(ASTRoot ast) {
@@ -150,7 +155,8 @@ public abstract class Language {
 
     }
 
-    private List<ASTNode> applyGrammar(List<ASTNode> nodes, Map<String, List<NodePattern>> grammar) {
+    private List<ASTNode> applyGrammar(List<Token> tokens, Map<String, List<NodePattern>> grammar) {
+        List<ASTNode> nodes = new ArrayList<>(tokens);
         Map<String, List<ASTNode>> nodeMap = mapNodes(nodes);
         while (!nodeMap.isEmpty()) {
             boolean hasMutated = false;
@@ -217,7 +223,7 @@ public abstract class Language {
         return nodeMap;
     }
 
-    private void normalize(List<ASTNode> nodes) {
+    private void normalize(List<Token> nodes) {
         int index = 0;
         Integer lastRelevantIndex = null;
         List<Integer> irrelevantIndexes = new ArrayList<>();
@@ -252,7 +258,7 @@ public abstract class Language {
         }
     }
 
-    public List<ASTNode> lex(
+    public List<Token> lex(
             MappedString code,
             int startingRow,
             int startingColumn,
@@ -260,7 +266,7 @@ public abstract class Language {
     ) {
         String hash = new String(md5.digest(code.toByteArray()));
         if (!lexCache.containsKey(hash)) {
-            List<ASTNode> tokens = new ArrayList<>();
+            List<Token> tokens = new ArrayList<>();
 
             AtomicInteger row = new AtomicInteger(startingRow);
             AtomicInteger col = new AtomicInteger(startingColumn);

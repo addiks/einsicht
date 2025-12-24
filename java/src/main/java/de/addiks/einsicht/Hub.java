@@ -25,6 +25,10 @@ public class Hub
         
     }
 
+    public static Hub instance() {
+        return Application.instance().hub();
+    }
+
     public void register(Object target) {
         register(target, target.getClass());
     }

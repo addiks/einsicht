@@ -8,20 +8,26 @@ import de.addiks.einsicht.abstract_syntax_tree.tokens.Token;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
+import java.util.List;
 
-public class PartitionParser implements FileTransaction.Partition.Factory {
+public class PartitionParser implements PartitionedFile.Partition.Factory {
     private final File file;
     private final FileByLineNumberIndex lineIndex;
     private final Language language;
 
-    public PartitionParser(File file, Language language) throws IOException {
+    public PartitionParser(File file, Language language, FileByLineNumberIndex lineIndex) {
         this.file = file;
         this.language = language;
-        lineIndex = new FileByLineNumberIndex(file);
+        this.lineIndex = lineIndex;
+    }
+
+    public PartitionParser(File file, Language language) throws IOException {
+        this(file, language, new FileByLineNumberIndex(file));
     }
 
     @Override
-    public FileTransaction.Partition create(
+    public PartitionedFile.Partition create(
             MappedString dataInPartition,
             long startingOffset
     ) throws IOException {
@@ -29,17 +35,50 @@ public class PartitionParser implements FileTransaction.Partition.Factory {
     }
 
     @Override
-    public FileTransaction.Partition combine(FileTransaction.Partition first, FileTransaction.Partition second) {
+    public PartitionedFile.Partition combine(PartitionedFile.Partition first, PartitionedFile.Partition second) {
+        if (!(first instanceof ParsedPartition firstParsedPartition)) {
+            throw new IllegalArgumentException("PartitionParser is incompatible with %s".formatted(
+                    first.getClass().getName()
+            ));
+        }
+        if (!(second instanceof ParsedPartition secondParsedPartition)) {
+            throw new IllegalArgumentException("PartitionParser is incompatible with %s".formatted(
+                    second.getClass().getName()
+            ));
+        }
+        ASTRoot firstAST = firstParsedPartition.syntaxTree();
+        ASTRoot secondAST = secondParsedPartition.syntaxTree();
 
-          Token preceedingToken = null;
-          if (first instanceof ParsedPartition firstParsedPartition) {
-              preceedingToken = firstParsedPartition.syntaxTree().lastToken();
-          }
+        Token firstLastToken = firstAST.lastToken();
+        Token secondFirstToken = secondAST.firstToken();
 
-          Token followingToken = null;
-          if (second instanceof ParsedPartition secondParsedPartition) {
-              followingToken = secondParsedPartition.syntaxTree().firstToken();
-          }
+        MappedString.Builder combinedCodeBuilder = firstLastToken.newStringBuilder();
+        combinedCodeBuilder.append(firstLastToken.getCode());
+        combinedCodeBuilder.append(secondFirstToken.getCode());
+
+        List<Token> combinedTokens = language.lex(
+                combinedCodeBuilder.build(),
+                firstLastToken.getRow(),
+                firstLastToken.getCol(),
+                firstLastToken.getOffset()
+        );
+
+        List<Token> allTokens = new ArrayList<>();
+        for (Token token : firstAST.collectTokens()) {
+            if (token != firstLastToken) {
+                allTokens.add(token);
+            }
+        }
+        allTokens.addAll(combinedTokens);
+        for (Token token : secondAST.collectTokens()) {
+            if (token != secondFirstToken) {
+                allTokens.add(token);
+            }
+        }
+
+        Language.ParseResult parseResult = language.parse(allTokens, file.toPath());
+
+        return new ParsedPartition(parseResult.ast(), this);
     }
 
     public ASTRoot parse(
@@ -55,7 +94,11 @@ public class PartitionParser implements FileTransaction.Partition.Factory {
                 startingOffset
         );
 
-        return parsed.previousAST();
+        return parsed.ast();
+    }
+
+    public FileByLineNumberIndex lineIndex() {
+        return lineIndex;
     }
 
     private int columnAtOffset(long offset) throws IOException {

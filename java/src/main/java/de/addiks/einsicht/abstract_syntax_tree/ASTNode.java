@@ -1,6 +1,7 @@
 package de.addiks.einsicht.abstract_syntax_tree;
 
 import de.addiks.einsicht.abstract_syntax_tree.selectors.ASTSelector;
+import de.addiks.einsicht.abstract_syntax_tree.tokens.Token;
 import de.addiks.einsicht.filehandling.codings.DecodedCharacter;
 import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.languages.Language;
@@ -94,6 +95,14 @@ public abstract class ASTNode {
     public void append(ASTNode node) {
         appended.add(node);
     }
+
+    public List<Token> collectTokens() {
+        List<Token> tokens = new ArrayList<>();
+        collectTokens(tokens);
+        return tokens;
+    }
+
+    public abstract void collectTokens(List<Token> tokens);
 
     public abstract MappedString.Builder newStringBuilder();
 

@@ -1,4 +1,4 @@
-package de.addiks.einsicht.widgets.abstract_syntax_tree;
+package de.addiks.einsicht.view.widgets.abstract_syntax_tree;
 
 import de.addiks.einsicht.abstract_syntax_tree.ASTNode;
 

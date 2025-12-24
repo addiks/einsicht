@@ -1,4 +1,4 @@
-package de.addiks.einsicht.widgets;
+package de.addiks.einsicht.view.widgets;
 
 import de.addiks.einsicht.Hub;
 

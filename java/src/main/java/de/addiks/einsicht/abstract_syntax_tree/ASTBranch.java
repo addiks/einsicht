@@ -51,6 +51,19 @@ public class ASTBranch extends ASTNode {
     }
 
     @Override
+    public void collectTokens(List<Token> tokens) {
+        for (ASTNode prepended : getPrepended()) {
+            tokens.addAll(prepended.collectTokens());
+        }
+        for (ASTNode child : children) {
+            tokens.addAll(child.collectTokens());
+        }
+        for (ASTNode appended : getAppended()) {
+            tokens.addAll(appended.collectTokens());
+        }
+    }
+
+    @Override
     public MappedString.Builder newStringBuilder() {
         return firstToken().newStringBuilder();
     }

@@ -9,6 +9,7 @@ plugins {
     // Apply the application plugin to add support for building a CLI application in Java.
     application
     id("org.openjfx.javafxplugin") version "0.1.0"
+    id("org.beryx.jlink") version "2.26.0"
 }
 
 repositories {
@@ -44,10 +45,11 @@ java {
 
 application {
     // Define the main class for the application.
-    mainClass = "de.addiks.passwordtrainer.Application"
+    mainClass = "de.addiks.einsicht.Application"
 }
 
 javafx {
+    version = "21"
     modules("javafx.controls", "javafx.fxml")
 }
 

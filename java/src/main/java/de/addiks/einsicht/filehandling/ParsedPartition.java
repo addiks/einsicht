@@ -1,17 +1,11 @@
 package de.addiks.einsicht.filehandling;
 
 import de.addiks.einsicht.abstract_syntax_tree.ASTRoot;
-import de.addiks.einsicht.filehandling.codings.BinaryString;
-import de.addiks.einsicht.filehandling.codings.DecodedCharacter;
 import de.addiks.einsicht.filehandling.codings.MappedString;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
 
-public class ParsedPartition implements FileTransaction.Partition {
+public class ParsedPartition implements PartitionedFile.Partition {
     private ASTRoot syntaxTree;
     private final PartitionParser parser;
     public ParsedPartition(ASTRoot syntaxTree, PartitionParser parser) {

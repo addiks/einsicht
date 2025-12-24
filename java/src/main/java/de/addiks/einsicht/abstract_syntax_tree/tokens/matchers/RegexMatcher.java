@@ -25,7 +25,7 @@ public class RegexMatcher extends TokenMatcher {
     @Override
     public TokenDef lexNext(ConsumableString text) {
         TokenDef token = null;
-        Matcher matcher = pattern.matcher(text.get());
+        Matcher matcher = pattern.matcher(text.get().asString());
         if (matcher.find()) {
             token = new TokenDef(tokenName, text.consume(matcher.group(groupNo)), this);
         }

@@ -2,7 +2,6 @@ package de.addiks.einsicht;
 
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
-import org.freedesktop.dbus.exceptions.DBusException;
 
 public class MessageBroker {
     private final Hub hub;
@@ -11,7 +10,7 @@ public class MessageBroker {
 
     public MessageBroker(Hub hub) throws Exception {
         this.hub = hub;
-        String filePath = hub.get(FileAccess.class).filePath();
+        String filePath = Application.instance().filePath().toString();
         serviceName = "de.addiks.einsicht.file_" + Application.md5(filePath);
         sessionBus = DBusConnectionBuilder.forSessionBus().build();
 

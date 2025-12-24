@@ -4,6 +4,7 @@ import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.languages.Language;
 import de.addiks.einsicht.abstract_syntax_tree.ASTNode;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Token extends ASTNode {
@@ -18,6 +19,17 @@ public class Token extends ASTNode {
 
     public String tokenName() {
         return tokenName;
+    }
+
+    @Override
+    public void collectTokens(List<Token> tokens) {
+        for (ASTNode prepended : getPrepended()) {
+            tokens.addAll(prepended.collectTokens());
+        }
+        tokens.add(this);
+        for (ASTNode appended : getAppended()) {
+            tokens.addAll(appended.collectTokens());
+        }
     }
 
     @Override

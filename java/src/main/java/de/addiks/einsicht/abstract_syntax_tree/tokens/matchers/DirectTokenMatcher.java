@@ -23,7 +23,7 @@ public class DirectTokenMatcher extends TokenMatcher {
     public TokenDef lexNext(ConsumableString text) {
         for (String directText : directTexts) {
             if (text.startsWith(directText)) {
-                return new TokenDef(tokenName, directText, this);
+                return new TokenDef(tokenName, text.substring(0, directText.length()), this);
             }
         }
         return null;

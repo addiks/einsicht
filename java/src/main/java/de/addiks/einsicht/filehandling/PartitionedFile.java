@@ -4,23 +4,24 @@ import com.sigpwned.chardet4j.Chardet;
 import de.addiks.einsicht.filehandling.codings.BinaryString;
 import de.addiks.einsicht.filehandling.codings.DecodedString;
 import de.addiks.einsicht.filehandling.codings.MappedString;
+import de.addiks.einsicht.filehandling.writing.FileWriteStrategy;
+import de.addiks.einsicht.filehandling.writing.WriteWholeFileDirectly;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class FileTransaction {
-    private static final Logger log = LoggerFactory.getLogger(FileTransaction.class);
+public class PartitionedFile {
+    private static final Logger log = LoggerFactory.getLogger(PartitionedFile.class);
     private final File file;
     private final Partition.Factory partitionFactory;
     private final List<PartitionAtArea> partitions = new ArrayList<>();
+    private final Map<Area, PartitionAtArea> areaToPartition = new HashMap<>();
     private final ScheduledExecutorService accessCloser = Executors.newSingleThreadScheduledExecutor();
     private final ReentrantLock lock = new ReentrantLock();
 
@@ -30,9 +31,18 @@ public class FileTransaction {
     private @Nullable Charset charset = null;
     private boolean wasDetectedAsBinary = false;
 
-    public FileTransaction(File file, Partition.Factory partitionFactory) {
+    public PartitionedFile(File file, Partition.Factory partitionFactory) {
         this.file = file;
         this.partitionFactory = partitionFactory;
+    }
+
+    public boolean isModified() {
+        for (PartitionAtArea partitionAtArea : partitions) {
+            if (partitionAtArea.partition.modified()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public interface Partition {
@@ -49,8 +59,16 @@ public class FileTransaction {
         }
     }
 
-    public List<Partition> partitionsFor(long offset, int length) throws IOException {
-        List<Partition> partitions = new ArrayList<>();
+    public List<PartitionAtArea> partitions() {
+        return partitions;
+    }
+
+    public File file() {
+        return file;
+    }
+
+    public List<PartitionAtArea> partitionsFor(long offset, int length) throws IOException {
+        List<PartitionAtArea> foundPartitions = new ArrayList<>();
         List<Area> notCoveredAreas = new ArrayList<>();
         notCoveredAreas.add(new Area(offset, length));
 
@@ -59,10 +77,10 @@ public class FileTransaction {
 
             for (PartitionAtArea partitionAtArea : this.partitions) {
                 if (partitionAtArea.area.containsWholly(areaToCover)) {
-                    partitions.add(partitionAtArea.partition);
+                    foundPartitions.add(partitionAtArea);
 
                 } else if (partitionAtArea.area.overlaps(areaToCover)) {
-                    partitions.add(partitionAtArea.partition);
+                    foundPartitions.add(partitionAtArea);
                     notCoveredAreas.addAll(areaToCover.cut(partitionAtArea.area));
                 }
             }
@@ -72,29 +90,37 @@ public class FileTransaction {
                     areaToCover.offset
             );
 
-            // TODO: Merge Partitions
+            Area areaBefore = areaDirectlyBefore(areaToCover.offset);
+            if (areaBefore != null) {
+                PartitionAtArea partitionBefore = areaToPartition.get(areaBefore);
+                newPartition = partitionFactory.combine(partitionBefore.partition, newPartition);
+                this.partitions.remove(partitionBefore);
+                areaToPartition.remove(areaBefore);
+            }
 
-            partitions.add(newPartition);
-            this.partitions.add(new PartitionAtArea(newPartition, areaToCover));
+            Area areaAfter = areaDirectlyAfter(areaToCover.end());
+            if (areaAfter != null) {
+                PartitionAtArea partitionAfter = areaToPartition.get(areaAfter);
+                newPartition = partitionFactory.combine(newPartition, partitionAfter.partition);
+                this.partitions.remove(partitionAfter);
+                areaToPartition.remove(areaAfter);
+            }
+
+            PartitionAtArea newPartitionAtArea = new PartitionAtArea(newPartition, areaToCover);
+            foundPartitions.add(newPartitionAtArea);
+            areaToPartition.put(areaToCover, newPartitionAtArea);
+            this.partitions.add(areaToPartition.get(areaToCover));
         }
 
-        return partitions;
+        return foundPartitions;
     }
 
-    public void commit() throws IOException {
-        for (PartitionAtArea partitionAtArea : partitions) {
-            if (partitionAtArea.partition.modified()) {
-                writeData(partitionAtArea.area, partitionAtArea.partition.currentContent());
-            }
-        }
-    }
-
-    public void rollback() throws IOException {
-        for (PartitionAtArea partitionAtArea : partitions) {
-            if (partitionAtArea.partition.modified()) {
-                partitionAtArea.partition.resetTo(readData(partitionAtArea.area));
-            }
-        }
+    private FileWriteStrategy determineBestWritingStrategy() {
+        // TODO
+        return new WriteWholeFileDirectly(); // if file is small enough to write all at once
+        // return new WritePartitionsShiftEnd(); // if file is too big and NOT enough space for a separate file is free
+        // return new WriteToSeparateFile(); // if file is too big and enough space is free
+        // Also: Maybe the user should be asked what behaviour is desired?
     }
 
     private MappedString readData(Area area) throws IOException {
@@ -146,10 +172,10 @@ public class FileTransaction {
         }
     }
 
-    private @Nullable Partition partitionDirectlyBefore(long offset) {
+    private @Nullable Area areaDirectlyBefore(long offset) {
         for (PartitionAtArea partitionAtArea : partitions) {
             if (partitionAtArea.area.end() == offset - 1) {
-                return partitionAtArea.partition;
+                return partitionAtArea.area;
             } else if (partitionAtArea.area.offset > offset) {
                 return null;
             }
@@ -157,10 +183,10 @@ public class FileTransaction {
         return null;
     }
 
-    private @Nullable Partition partitionDirectlyAfter(long offset) {
+    private @Nullable Area areaDirectlyAfter(long offset) {
         for (PartitionAtArea partitionAtArea : partitions) {
             if (partitionAtArea.area.offset == offset + 1) {
-                return partitionAtArea.partition;
+                return partitionAtArea.area;
             } else if (partitionAtArea.area.end() > offset) {
                 return null;
             }
@@ -193,8 +219,8 @@ public class FileTransaction {
         }
     }
 
-    private record PartitionAtArea(Partition partition, Area area) {}
-    private record Area(long offset, int length) {
+    public record PartitionAtArea(Partition partition, Area area) {}
+    public record Area(long offset, int length) {
         long end() {
             return offset + length;
         }

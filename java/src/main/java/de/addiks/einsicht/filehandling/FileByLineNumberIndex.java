@@ -14,12 +14,16 @@ public class FileByLineNumberIndex {
     private static final int BUFFER_SIZE = 4096;
     private final File file;
     private final List<Milestone> milestones = new ArrayList<>();
-    private final int lastLine;
-    private final long lastOffset;
+    private int lastLine = 0;
+    private long lastOffset = 0;
+
     private final int milestoneSize;
 
     private record Milestone(int line, long offset) {}
 
+    private boolean milestonesRead = false;
+    private @Nullable Long begin;
+    private @Nullable Long end;
     private @Nullable FileByLineNumberIndex lastUsedInnerIndex;
 
     public FileByLineNumberIndex(File file) throws IOException {
@@ -42,6 +46,15 @@ public class FileByLineNumberIndex {
     ) throws IOException {
         this.file = file;
         this.milestoneSize = milestoneSize;
+        this.begin = begin;
+        this.end = end;
+        if (file.exists()) {
+            readMilestones(firstLineNumber);
+        }
+    }
+
+    public void readMilestones(int firstLineNumber) throws IOException {
+
         try (RandomAccessFile handle = new RandomAccessFile(file, "r")) {
             if (begin != null) {
                 handle.seek(begin);
@@ -73,10 +86,14 @@ public class FileByLineNumberIndex {
             }
             lastLine = lineNumber;
             lastOffset = end;
+            milestonesRead = true;
         }
     }
 
     public long offsetAtLine(int line) throws IOException {
+        if (!milestonesRead) {
+            return 0;
+        }
         if (lastUsedInnerIndex != null && lastUsedInnerIndex.containsLine(line)) {
             return lastUsedInnerIndex.offsetAtLine(line);
         }
@@ -113,6 +130,9 @@ public class FileByLineNumberIndex {
     }
 
     public int lineAtOffset(long offset) throws IOException {
+        if (!milestonesRead) {
+            return 0;
+        }
         if (lastUsedInnerIndex != null && lastUsedInnerIndex.containsOffset(offset)) {
             return lastUsedInnerIndex.lineAtOffset(offset);
         }

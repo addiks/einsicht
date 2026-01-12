@@ -3,12 +3,10 @@ package de.addiks.einsicht.abstract_syntax_tree;
 import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.semantics.Semantic;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.Token;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ASTBranch extends ASTNode {
     private final Map<ASTNode, Integer> childToIndex;
@@ -52,13 +50,13 @@ public class ASTBranch extends ASTNode {
 
     @Override
     public void collectTokens(List<Token> tokens) {
-        for (ASTNode prepended : getPrepended()) {
+        for (ASTNode prepended : prepended()) {
             tokens.addAll(prepended.collectTokens());
         }
         for (ASTNode child : children) {
             tokens.addAll(child.collectTokens());
         }
-        for (ASTNode appended : getAppended()) {
+        for (ASTNode appended : appended()) {
             tokens.addAll(appended.collectTokens());
         }
     }
@@ -70,13 +68,13 @@ public class ASTBranch extends ASTNode {
 
     @Override
     public void reconstructCode(MappedString.Builder codeBuilder) {
-        for (ASTNode prepended : getPrepended()) {
+        for (ASTNode prepended : prepended()) {
             prepended.reconstructCode(codeBuilder);
         }
-        for (ASTNode child : getChildren()) {
+        for (ASTNode child : children()) {
             child.reconstructCode(codeBuilder);
         }
-        for (ASTNode appended : getAppended()) {
+        for (ASTNode appended : appended()) {
             appended.reconstructCode(codeBuilder);
         }
     }
@@ -103,24 +101,14 @@ public class ASTBranch extends ASTNode {
         return null;
     }
 
-    public @Nullable Token firstToken() {
-        ASTNode first = firstChild();
-        if (first instanceof Token token) {
-            return token;
-        } else if (first instanceof ASTBranch firstBranch) {
-            return firstBranch.firstToken();
-        }
-        return null;
+    @Override
+    public @NonNull Token firstToken() {
+        return firstChild().firstToken();
     }
 
-    public @Nullable Token lastToken() {
-        ASTNode last = lastChild();
-        if (last instanceof Token token) {
-            return token;
-        } else if (last instanceof ASTBranch lastBranch) {
-            return lastBranch.lastToken();
-        }
-        return null;
+    @Override
+    public @NonNull Token lastToken() {
+        return lastChild().lastToken();
     }
 
 }

@@ -10,7 +10,7 @@ public class ParentSelector implements ASTSelector {
 
     @Override
     public boolean matches(ASTNode node) {
-        ASTNode parent = node.getParent();
+        ASTNode parent = node.parent();
         if (parent == null) {
             return false;
         }

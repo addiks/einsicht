@@ -1,5 +1,6 @@
 package de.addiks.einsicht.abstract_syntax_tree.tokens;
 
+import de.addiks.einsicht.filehandling.RowColumnOffset;
 import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.languages.Language;
 
@@ -14,8 +15,8 @@ public class TokenDef {
         this.matcher = matcher;
     }
 
-    public Token toToken(Language language, int row, int col, long offset) {
-        return new Token(language, tokenName, code, row, col, offset);
+    public Token toToken(Language language, RowColumnOffset position, Token previous) {
+        return new Token(language, tokenName, code, position, previous, matcher);
     }
 
 }

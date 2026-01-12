@@ -3,14 +3,20 @@ package de.addiks.einsicht;
 import java.io.File;
 import java.io.IOException;
 import java.lang.Runtime;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 import de.addiks.einsicht.filehandling.FileByLineNumberIndex;
@@ -20,19 +26,19 @@ import de.addiks.einsicht.filehandling.writing.FileWriteStrategy;
 import de.addiks.einsicht.filehandling.writing.WriteWholeFileDirectly;
 import de.addiks.einsicht.languages.Language;
 import de.addiks.einsicht.languages.LanguageSelector;
-import de.addiks.einsicht.abstract_syntax_tree.ASTNode;
-import de.addiks.einsicht.abstract_syntax_tree.ASTRoot;
 import de.addiks.einsicht.versioning.Versioning;
 import de.addiks.einsicht.versioning.VersioningSelector;
-import de.addiks.einsicht.view.JavaFXThread;
+import de.addiks.einsicht.view.JavaFXApp;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
-import de.addiks.einsicht.view.widgets.EditorWindow;
 import org.jspecify.annotations.Nullable;
+
+import javax.swing.text.DateFormatter;
 
 public class Application {
     private static final Logger LOGGER = LogManager.getLogger();
+    private static final DateTimeFormatter dateFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM);
     
     private final static MessageDigest sha256;
     static {
@@ -44,7 +50,8 @@ public class Application {
     }
     
     private static Application instance = null;
-    
+
+    private final Clock clock;
     private final Hub hub = new Hub();
     private final VersioningSelector versioningSelector;
     
@@ -58,7 +65,7 @@ public class Application {
 
     private Path filePath = null;
 
-    private JavaFXThread javaFXThread = new JavaFXThread();
+    private JavaFXApp.JavaFXThread javaFXThread = new JavaFXApp.JavaFXThread();
     
 
     public static void main(String[] argv) {
@@ -68,18 +75,11 @@ public class Application {
                 filePath = FileSystems.getDefault().getPath(argv[1]).toAbsolutePath();
             }
 
-
-            Application.instance = new Application(filePath);
-            return;
-//        } catch (SystemExit exception) {
-//            return 0;
-        
-     //   } catch (MessageBroker.FileAlreadyOpenOnOtherProcessException exception) {
-     //       return;
+            Application.instance = new Application(filePath, Clock.system(ZoneId.systemDefault()));
+            Application.instance().run();
 
         } catch (Exception exception) {
             LOGGER.error("Uncatched: {}", exception.getMessage(), exception);
-            return;
         }
     }
     
@@ -87,27 +87,50 @@ public class Application {
         return Application.instance;
     }
     
-    public Application(@Nullable Path filePath) throws IOException {
+    public Application(@Nullable Path filePath, Clock clock) {
         instance = this;
         hub.setup(this);
+        this.clock = clock;
+        this.filePath = filePath;
+        versioningSelector = new VersioningSelector(hub);
+    }
 
+    public void run() throws IOException {
         if (filePath == null) {
-            UUID id = UUID.randomUUID();
-            filePath = userStorageFolder().resolve("new-files/" + id);
+            filePath = folderForUnnamedFiles().resolve(newUnnamedFileName());
             filePath.getParent().toFile().mkdirs();
             filePath.toFile().createNewFile();
         }
-
-        this.filePath = filePath;
-
-      //  window = new EditorWindow(hub);
-        versioningSelector = new VersioningSelector(hub);
 
         openFile(filePath);
 
         // JavaFXApp.launch();
         javaFXThread.start();
         isReadyForInteraction = true;
+    }
+
+    public void exit() {
+        saveFile();
+        File file = filePath.toFile();
+        if (file.length() == 0) {
+            file.delete();
+        }
+        System.exit(0);
+    }
+
+    private static String newUnnamedFileName() {
+        // TODO: These language names are probably mostly wrong
+        String wordUnnamed = switch (Locale.getDefault().getDisplayLanguage()) {
+            case "Deutsch" -> "Datei ohne Namen von %s";
+            case "French" -> "Fichier sans nom du %s";
+            case "Spanish" -> "Archivo sin nombre del %s";
+            case "Italian" -> "File senza nome del %s";
+            case "Chinese" -> "的未命名文件 %s";
+            case "Japanese" -> "名前のないファイル %s";
+            case "Ukranian" -> "Файл без назви з %s";
+            default -> "Unnamed file at %s";
+        };
+        return wordUnnamed.formatted(dateFormatter.format(LocalDateTime.now()));
     }
 
     public boolean isReadyForInteraction() {
@@ -120,7 +143,6 @@ public class Application {
 
     public void openFile(Path filePath) throws IOException {
         this.filePath = filePath.toAbsolutePath();
-        System.out.println(filePath);
         // Log.setPrefix(self.fileNameDescription() + ' - ')
         try {
             messageBroker = new MessageBroker(hub);
@@ -133,6 +155,8 @@ public class Application {
 
         File file = filePath.toFile();
         FileByLineNumberIndex lineIndex = new FileByLineNumberIndex(file);
+        hub.register(lineIndex);
+
         PartitionParser partitionParser = new PartitionParser(file, language, lineIndex);
         partitionedFile = new PartitionedFile(file, partitionParser);
         hub.register(partitionedFile);
@@ -222,8 +246,28 @@ public class Application {
         return "";
     }
 
-    public Path userStorageFolder() {
-        return Path.of(System.getProperty("user.home")).resolve(".local/share/addiks/Einsicht");
+    public Path folderForUnnamedFiles() {
+        String osName = System.getProperty("os.name");
+        Path userHome = Path.of(System.getProperty("user.home"));
+        for (String desktopSubDir : List.of(
+                "Schreibtisch", "Arbeitsfläche", "Desktop", "DeskTop", "Bureau", "Escritorio", "Scrivania",
+                "Área de Trabalho", "Bureaublad", "Skrivebord", "Skrivbord", "Työpöytä", "Pulpit", "Plocha",
+                "Стільниця", "Робочий стіл", "Επιφάνεια εργασίας", "Masaüstü", "デスクトップ", "桌面", "바탕화면"
+        )) {
+            Path desktopDir = userHome.resolve(desktopSubDir);
+            if (desktopDir.toFile().exists()) {
+                return desktopDir;
+            }
+        }
+        if (osName.contains("Windows")) {
+            return userHome.resolve("AppData\\Roaming\\addiks\\Einsicht");
+        }
+        if (osName.contains("Mac OS")) {
+            return userHome.resolve("Library/Application Support/Einsicht");
+        }
+        // TODO: Try env-var XDG_DESKTOP_DIR
+        // TODO: Read ~/.config/user-dirs.dirs
+        return userHome.resolve(".local/share/addiks/Einsicht");
     }
 
     public static String md5(String input) {

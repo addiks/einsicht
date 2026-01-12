@@ -10,6 +10,6 @@ public class ByGrammarKey implements ASTSelector {
 
     @Override
     public boolean matches(ASTNode node) {
-        return node.getGrammarKey().equalsIgnoreCase(grammarKey);
+        return node.grammarKey().equalsIgnoreCase(grammarKey);
     }
 }

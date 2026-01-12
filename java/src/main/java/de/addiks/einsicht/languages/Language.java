@@ -5,14 +5,18 @@ import de.addiks.einsicht.abstract_syntax_tree.ASTBranch;
 import de.addiks.einsicht.abstract_syntax_tree.ASTNode;
 import de.addiks.einsicht.abstract_syntax_tree.ASTRoot;
 import de.addiks.einsicht.abstract_syntax_tree.patterns.NodePattern;
+import de.addiks.einsicht.filehandling.RowColumnOffset;
+import de.addiks.einsicht.filehandling.codings.DecodedString;
 import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.semantics.Semantic;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.ConsumableString;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.Token;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.TokenDef;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.TokenMatcher;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.jspecify.annotations.Nullable;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -20,9 +24,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
+@NonNullByDefault
 public abstract class Language {
     private static final MessageDigest md5;
     static {
@@ -36,7 +39,7 @@ public abstract class Language {
     private final Map<String, List<Token>> lexCache = new HashMap<>();
     private final Map<String, ParseResult> parseCache = new HashMap<>();
     private final Hub hub;
-    private Map<String,List<NodePattern>> grammarMap = null;
+    private @Nullable Map<String,List<NodePattern>> grammarMap = null;
 
     public Language(Hub hub) {
         this.hub = hub;
@@ -84,27 +87,33 @@ public abstract class Language {
         return new ParseResult(ast, tokens);
     }
 
-    public ParseResult parse(
-            MappedString code,
-            Path filepath,
-            int startingRow,
-            int startingColumn,
-            long startingOffset
-    ) {
+    public ParseResult parse(MappedString code, Path filepath, RowColumnOffset startingPosition) {
         String hash = new String(md5.digest(code.toByteArray()));
         if (!parseCache.containsKey(hash)) {
-            List<Token> tokens = lex(code, startingRow, startingColumn, startingOffset);
+            List<Token> tokens = lex(code, startingPosition);
             if (!tokens.isEmpty()) {
                 parseCache.put(hash, parse(tokens, filepath));
             }
         }
-        return parseCache.getOrDefault(hash, new ParseResult(null, List.of()));
+        return parseCache.getOrDefault(hash, new ParseResult(emptyAST(filepath), List.of()));
     }
 
     public record ParseResult(
-            @Nullable ASTRoot ast,
+            ASTRoot ast,
             List<Token> tokens
     ) {}
+
+    private ASTRoot emptyAST(Path filepath) {
+        return new ASTRoot(List.of(
+                new Token(
+                        this,
+                        "T_NULL",
+                        new DecodedString(StandardCharsets.UTF_8, List.of()),
+                        new RowColumnOffset(),
+                        null
+                )
+        ), filepath);
+    }
 
     private void addSemanticsTo(ASTRoot ast) {
 
@@ -148,7 +157,7 @@ public abstract class Language {
 
                     Semantic.Contextual contextual = contextualFactory.combine(semantic, related);
 
-
+                    // TODO
                 }
             }
         }
@@ -184,7 +193,7 @@ public abstract class Language {
                                     nodeMap.remove(replacedNodeKey);
                                 }
 
-                                String code = replacedNode.getCode().asString();
+                                String code = replacedNode.code().asString();
                                 if (nodeMap.containsKey(code) && nodeMap.get(code).contains(replacedNode)) {
                                     nodeMap.get(code).remove(replacedNode);
                                     if (nodeMap.get(code).isEmpty()) {
@@ -217,7 +226,7 @@ public abstract class Language {
         for (ASTNode node : nodes) {
             if (node instanceof Token token) {
                 nodeMap.computeIfAbsent(token.tokenName(), t -> new ArrayList<>()).add(token);
-                nodeMap.computeIfAbsent(token.getCode().asString(), t -> new ArrayList<>()).add(token);
+                nodeMap.computeIfAbsent(token.code().asString(), t -> new ArrayList<>()).add(token);
             }
         }
         return nodeMap;
@@ -260,23 +269,20 @@ public abstract class Language {
 
     public List<Token> lex(
             MappedString code,
-            int startingRow,
-            int startingColumn,
-            long startingOffset
+            @Nullable RowColumnOffset position
     ) {
         String hash = new String(md5.digest(code.toByteArray()));
         if (!lexCache.containsKey(hash)) {
             List<Token> tokens = new ArrayList<>();
 
-            AtomicInteger row = new AtomicInteger(startingRow);
-            AtomicInteger col = new AtomicInteger(startingColumn);
-            AtomicLong offset = new AtomicLong(startingOffset);
-
-        //    code = code.replaceAll("\r\n", "\n");
-        //    code = code.replaceAll("\r", "\n");
+            if (position == null) {
+                position = new RowColumnOffset();
+            }
 
             ConsumableString consumableCode = new ConsumableString(code);
             List<TokenMatcher> matchers = tokenMatchers();
+
+            Token token = null;
 
             while (!code.isEmpty()) {
                 int beforeLength = code.length();
@@ -288,45 +294,31 @@ public abstract class Language {
 
                     TokenDef tokenDef = matcher.lexNext(consumableCode);
                     if (tokenDef != null) {
-                        tokens.add(tokenDef.toToken(this, row.get(), col.get(), offset.get()));
+                        token = tokenDef.toToken(this, position, token);
+                        tokens.add(token);
                     }
 
                     MappedString processedCode = consumableCode.consumed(lengthBefore - consumableCode.length());
-                    updateRowColOffsetForProcessed(offset, row, col, processedCode);
+                    position = position.advance(processedCode);
                 }
                 if (beforeLength == consumableCode.length()) {
                     MappedString invalidChar = consumableCode.substring(0,1);
-                    tokens.add(new Token(
+                    token = new Token(
                             this,
                             "T_INVALID",
                             invalidChar,
-                            row.get(),
-                            col.get(),
-                            offset.get()
-                    ));
-                    updateRowColOffsetForProcessed(offset, row, col, invalidChar);
+                            position,
+                            token,
+                            null
+                    );
+                    tokens.add(token);
+                    position = position.advance(invalidChar);
                     consumableCode.consume(1);
                 }
             }
             lexCache.put(hash, tokens);
         }
         return lexCache.get(hash);
-    }
-
-    private void updateRowColOffsetForProcessed(
-            AtomicLong offset,
-            AtomicInteger row,
-            AtomicInteger col,
-            MappedString processedCode
-    ) {
-        int processedLength = processedCode.length();
-        offset.set(offset.get() + processedLength);
-        row.set(row.get() + processedCode.substringCount("\n"));
-        if (processedCode.contains("\n")) {
-            col.set(col.get() + processedLength - processedCode.lastIndexOf("\n"));
-        } else {
-            col.set(col.get() + processedLength);
-        }
     }
 
     private Map<String, List<NodePattern>> grammarMap() {
@@ -351,17 +343,17 @@ public abstract class Language {
             return;
         }
         for (ASTNode node : nodes) {
-            String nodeDescr = "node: " + node.getGrammarKey();
+            String nodeDescr = "node: " + node.grammarKey();
             if (node instanceof Token token) {
-                nodeDescr = token.tokenName() + " - " + token.getCode().asString().trim();
+                nodeDescr = token.tokenName() + " - " + token.code().asString().trim();
             }
             System.out.println(
-                    String.format("%1$3s", node.getRow()).replace(' ', '0') +
+                    String.format("%1$3s", node.row()).replace(' ', '0') +
                     "-" +
                     String.format("%1$" + level + "s", "|") +
                     nodeDescr +
                     ">" +
-                    node.getCode().asString().trim()
+                    node.code().asString().trim()
             );
         }
         if (level == 0) {

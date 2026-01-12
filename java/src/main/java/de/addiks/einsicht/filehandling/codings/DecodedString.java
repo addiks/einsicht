@@ -58,6 +58,9 @@ public class DecodedString extends ArrayList<DecodedCharacter> implements Mapped
 
     @Override
     public byte[] toByteArray() {
+        if (isEmpty()) {
+            return new byte[0];
+        }
         DecodedCharacter lastChar = getLast();
         int length = offsetOf(lastChar) + lastChar.bytes().length;
         byte[] result = new byte[length];

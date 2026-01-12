@@ -34,10 +34,10 @@ public class Hub
     }
 
     public <T> void register(T target, Class<? extends T> key) {
-        log.info("Hub registered {} as {}", target, key);
+        log.debug("Hub registered {} as {}", target, key);
         objects.put(key, target);
         Class<?> superClass = key.getSuperclass();
-        if (superClass != null) {
+        if (superClass != null && superClass != Object.class) {
             register(target, superClass);
         }
         for (Class<?> interfaceClass : key.getInterfaces()) {
@@ -62,12 +62,12 @@ public class Hub
     }
 
     public void on(Class<?> event, Listener listener) {
-        log.info("Hub listening on {} for handler {}", event, listener);
+        log.debug("Hub listening on {} for handler {}", event, listener);
         classListeners.computeIfAbsent(event, k -> new ArrayList<>()).add(listener);
     }
 
     public void on(Method event, Listener listener) {
-        log.info("Hub listening on {} for handler {}", event, listener);
+        log.debug("Hub listening on {} for handler {}", event, listener);
         methodListeners.computeIfAbsent(event, k -> new ArrayList<>()).add(listener);
     }
 

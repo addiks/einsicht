@@ -26,7 +26,7 @@ public class TokenNodePattern implements NodePattern {
     @Override
     public boolean matches(List<ASTNode> nodes, int index) {
         if (nodes.get(index) instanceof Token token) {
-            return token.tokenName().equals(tokenName) || token.getCode().equals(tokenName);
+            return token.tokenName().equals(tokenName) || token.code().equals(tokenName);
         }
         return false;
     }
@@ -36,7 +36,7 @@ public class TokenNodePattern implements NodePattern {
         ASTNode node = nodes.get(index);
         assert node instanceof Token;
         Token token = (Token) node;
-        assert tokenName.equals(token.tokenName()) || tokenName.equals(token.getCode());
+        assert tokenName.equals(token.tokenName()) || tokenName.equals(token.code());
         return new MutationResult(List.of(), index);
     }
 }

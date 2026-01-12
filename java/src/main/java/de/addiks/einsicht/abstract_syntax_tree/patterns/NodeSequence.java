@@ -39,7 +39,7 @@ public class NodeSequence implements NodePattern {
                 if (result.newIndex() != null) {
                     index = result.newIndex() + 1;
                 }
-            } else if (pattern.producedNodeKey().equals(nodes.get(index).getGrammarKey())) {
+            } else if (pattern.producedNodeKey().equals(nodes.get(index).grammarKey())) {
                 index++;
             } else {
                 return false;
@@ -68,7 +68,7 @@ public class NodeSequence implements NodePattern {
                     end = Math.max(end, patternResult.newIndex());
                     index = patternResult.newIndex() + 1;
                 }
-            } else if (pattern.producedNodeKey().equals(nodes.get(index).getGrammarKey())) {
+            } else if (pattern.producedNodeKey().equals(nodes.get(index).grammarKey())) {
                 allNewNodes.add(nodes.get(index));
                 start = Math.min(start, index);
                 end = Math.max(end, index);

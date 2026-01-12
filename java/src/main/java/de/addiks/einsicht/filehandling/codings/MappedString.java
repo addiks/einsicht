@@ -12,6 +12,56 @@ public interface MappedString extends List<DecodedCharacter> {
     byte[] toByteArray();
     Builder newBuilder();
 
+    default int lastIndexOf(String other) {
+        int searchLength = length() - other.length();
+        int otherLength = other.length();
+        char firstChar = other.charAt(0);
+        int lastIndex = -1;
+        for (int offset = 0; offset < searchLength; offset++) {
+            if (firstChar == charAt(offset) && other.equals(substring(offset, offset+otherLength).asString())) {
+                lastIndex = offset;
+            }
+        }
+        return lastIndex;
+    }
+
+    default int lastIndexOf(MappedString other) {
+        int searchLength = length() - other.length();
+        int otherLength = other.length();
+        char firstChar = other.charAt(0);
+        int lastIndex = -1;
+        for (int offset = 0; offset < searchLength; offset++) {
+            if (firstChar == charAt(offset) && other.equals(substring(offset, offset+otherLength))) {
+                lastIndex = offset;
+            }
+        }
+        return lastIndex;
+    }
+
+    default boolean contains(String other) {
+        int searchLength = length() - other.length();
+        int otherLength = other.length();
+        char firstChar = other.charAt(0);
+        for (int offset = 0; offset < searchLength; offset++) {
+            if (firstChar == charAt(offset) && other.equals(substring(offset, offset+otherLength).asString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    default boolean contains(MappedString other) {
+        int searchLength = length() - other.length();
+        int otherLength = other.length();
+        char firstChar = other.charAt(0);
+        for (int offset = 0; offset < searchLength; offset++) {
+            if (firstChar == charAt(offset) && other.equals(substring(offset, offset+otherLength))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     default boolean startsWith(MappedString prefix) {
         for (int offset = 0; offset < prefix.length(); offset++) {
             if (prefix.charAt(offset) != charAt(offset)) {

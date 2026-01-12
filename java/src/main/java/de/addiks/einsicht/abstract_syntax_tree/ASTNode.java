@@ -2,10 +2,9 @@ package de.addiks.einsicht.abstract_syntax_tree;
 
 import de.addiks.einsicht.abstract_syntax_tree.selectors.ASTSelector;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.Token;
-import de.addiks.einsicht.filehandling.codings.DecodedCharacter;
+import de.addiks.einsicht.filehandling.RowColumnOffset;
 import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.languages.Language;
-import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -21,10 +20,8 @@ import java.util.function.Predicate;
 public abstract class ASTNode {
     private final Language language;
     private boolean dirty = false;
-    private final int row;
-    private @Nullable Integer lastRow = null;
-    private final int col;
-    private final long offset;
+    private final RowColumnOffset position;
+    private @Nullable RowColumnOffset end = null;
     private final String grammarKey;
     private @Nullable ASTBranch parent;
     protected final List<ASTNode> children = new ArrayList<>();
@@ -32,29 +29,19 @@ public abstract class ASTNode {
     private final List<ASTNode> prepended = new ArrayList<>();
     private final List<ASTNode> appended = new ArrayList<>();
 
-    public ASTNode(
-            Language language,
-            int row,
-            int col,
-            int offset,
-            String grammarKey
-    ) {
-        this(language, row, col, offset, grammarKey, null, List.of());
+    public ASTNode(Language language, RowColumnOffset position, String grammarKey) {
+        this(language, position, grammarKey, null, List.of());
     }
 
     public ASTNode(
             Language language,
-            int row,
-            int col,
-            long offset,
+            RowColumnOffset position,
             String grammarKey,
             @Nullable ASTBranch parent,
             List<ASTNode> children
     ) {
         this.language = language;
-        this.row = row;
-        this.col = col;
-        this.offset = offset;
+        this.position = position;
         this.grammarKey = grammarKey;
         this.parent = parent;
         this.children.addAll(children);
@@ -66,15 +53,7 @@ public abstract class ASTNode {
         @Nullable ASTBranch parent,
         List<ASTNode> children
     ) {
-        this(
-                example.getLanguage(),
-                example.getRow(),
-                example.getCol(),
-                example.getOffset(),
-                grammarKey,
-                parent,
-                children
-        );
+        this(example.language(), example.position, grammarKey, parent, children);
     }
 
     public Path filePath() {
@@ -82,10 +61,7 @@ public abstract class ASTNode {
     }
 
     public int lastRow() {
-        if (lastRow == null) {
-            lastRow = row + getCode().substringCount("\n");
-        }
-        return lastRow;
+        return end().row();
     }
 
     public void prepend(ASTNode node) {
@@ -95,6 +71,10 @@ public abstract class ASTNode {
     public void append(ASTNode node) {
         appended.add(node);
     }
+
+    public abstract Token firstToken();
+
+    public abstract Token lastToken();
 
     public List<Token> collectTokens() {
         List<Token> tokens = new ArrayList<>();
@@ -185,10 +165,10 @@ public abstract class ASTNode {
     }
 
     public boolean isAtOffset(int offset) {
-        if (this.offset > offset) {
+        if (this.offset() > offset) {
             return false;
         }
-        return this.offset + getCode().length() > offset;
+        return this.offset() + code().length() > offset;
     }
 
     public boolean hasParentWith(Selector selector) {
@@ -249,57 +229,78 @@ public abstract class ASTNode {
         return null;
     }
 
-    public Language getLanguage() {
+    public Language language() {
         return language;
     }
 
-    public MappedString getCode() {
+    public MappedString code() {
         // TODO: Some caching here?
         return reconstructCode();
     }
 
-    public int getRow() {
-        return row;
+    public RowColumnOffset position() {
+        return position;
     }
 
-    public @Nullable Integer getLastRow() {
-        return lastRow;
+    public RowColumnOffset end() {
+        if (end == null) {
+            end = position.advance(reconstructCode());
+        }
+        return end;
     }
 
-    public int getCol() {
-        return col;
+    public int row() {
+        return position.row();
     }
 
-    public long getOffset() {
-        return offset;
+    public int column() {
+        return position.column();
     }
 
-    public String getGrammarKey() {
-        return grammarKey;
+    public long offset() {
+        return position.offset();
     }
 
-    public @Nullable ASTNode getParent() {
+    public @Nullable ASTBranch parent() {
         return parent;
+    }
+
+    public ASTRoot root() {
+        if (parent != null) {
+            return parent.root();
+        }
+        if (this instanceof ASTRoot root) {
+            return root;
+        }
+        throw new IllegalStateException("Only ASTRoot is allowed to not have a parent!");
     }
 
     public void setParent(@Nullable ASTBranch parent) {
         this.parent = parent;
     }
 
-    public List<ASTNode> getChildren() {
-        return children;
-    }
-
-    public Map<String, String> getAttributes() {
+    public Map<String, String> attributes() {
         return attributes;
     }
 
-    public List<ASTNode> getPrepended() {
+    public List<ASTNode> children() {
+        return children;
+    }
+
+    public List<ASTNode> prepended() {
         return prepended;
     }
 
-    public List<ASTNode> getAppended() {
+    public List<ASTNode> appended() {
         return appended;
+    }
+
+    public List<ASTNode> allChildren() {
+        List<ASTNode> children = new ArrayList<>();
+        children.addAll(prepended);
+        children.addAll(this.children);
+        children.addAll(appended);
+        return children;
     }
 
     public void iterate(Consumer<ASTNode> consumer) {

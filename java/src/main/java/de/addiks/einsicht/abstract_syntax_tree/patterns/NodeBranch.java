@@ -28,7 +28,7 @@ public class NodeBranch implements NodePattern {
 
     @Override
     public boolean matches(List<ASTNode> nodes, int index) {
-        String grammarKey = nodes.get(index).getGrammarKey();
+        String grammarKey = nodes.get(index).grammarKey();
         if (patterns.containsKey(grammarKey)) {
             for (NodePattern pattern : patterns.get(grammarKey)) {
                 if (pattern.producedNodeKey().equals(nodes.get(index).grammarKey())) {
@@ -43,7 +43,7 @@ public class NodeBranch implements NodePattern {
 
     @Override
     public MutationResult mutate(List<ASTNode> nodes, int index) {
-        String grammarKey = nodes.get(index).getGrammarKey();
+        String grammarKey = nodes.get(index).grammarKey();
         if (patterns.containsKey(grammarKey)) {
             for (NodePattern pattern : patterns.get(grammarKey)) {
                 if (pattern.producedNodeKey().equals(nodes.get(index).grammarKey())) {

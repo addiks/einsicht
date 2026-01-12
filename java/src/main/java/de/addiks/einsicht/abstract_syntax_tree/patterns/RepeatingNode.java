@@ -59,7 +59,7 @@ public class RepeatingNode implements NodePattern {
 
                 index = result.newIndex() + 1;
 
-            } else if (nodes.get(index).getGrammarKey().equals(pattern.producedNodeKey())) {
+            } else if (nodes.get(index).grammarKey().equals(pattern.producedNodeKey())) {
                 index++;
 
             } else {

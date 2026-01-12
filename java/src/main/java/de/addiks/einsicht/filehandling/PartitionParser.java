@@ -4,6 +4,7 @@ import de.addiks.einsicht.abstract_syntax_tree.ASTRoot;
 import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.languages.Language;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.Token;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 
 import java.io.File;
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
 
+@NonNullByDefault
 public class PartitionParser implements PartitionedFile.Partition.Factory {
     private final File file;
     private final FileByLineNumberIndex lineIndex;
@@ -27,7 +29,7 @@ public class PartitionParser implements PartitionedFile.Partition.Factory {
     }
 
     @Override
-    public PartitionedFile.Partition create(
+    public ParsedPartition create(
             MappedString dataInPartition,
             long startingOffset
     ) throws IOException {
@@ -35,7 +37,7 @@ public class PartitionParser implements PartitionedFile.Partition.Factory {
     }
 
     @Override
-    public PartitionedFile.Partition combine(PartitionedFile.Partition first, PartitionedFile.Partition second) {
+    public ParsedPartition combine(PartitionedFile.Partition first, PartitionedFile.Partition second) {
         if (!(first instanceof ParsedPartition firstParsedPartition)) {
             throw new IllegalArgumentException("PartitionParser is incompatible with %s".formatted(
                     first.getClass().getName()
@@ -53,14 +55,12 @@ public class PartitionParser implements PartitionedFile.Partition.Factory {
         Token secondFirstToken = secondAST.firstToken();
 
         MappedString.Builder combinedCodeBuilder = firstLastToken.newStringBuilder();
-        combinedCodeBuilder.append(firstLastToken.getCode());
-        combinedCodeBuilder.append(secondFirstToken.getCode());
+        combinedCodeBuilder.append(firstLastToken.code());
+        combinedCodeBuilder.append(secondFirstToken.code());
 
         List<Token> combinedTokens = language.lex(
                 combinedCodeBuilder.build(),
-                firstLastToken.getRow(),
-                firstLastToken.getCol(),
-                firstLastToken.getOffset()
+                firstLastToken.position()
         );
 
         List<Token> allTokens = new ArrayList<>();
@@ -81,17 +81,15 @@ public class PartitionParser implements PartitionedFile.Partition.Factory {
         return new ParsedPartition(parseResult.ast(), this);
     }
 
-    public ASTRoot parse(
-            MappedString originalContent,
-            long startingOffset
-    ) throws IOException {
-
+    public ASTRoot parse(MappedString originalContent, long startingOffset) throws IOException {
         Language.ParseResult parsed = language.parse(
                 originalContent,
                 file.toPath(),
-                lineIndex.lineAtOffset(startingOffset),
-                columnAtOffset(startingOffset),
-                startingOffset
+                new RowColumnOffset(
+                        lineIndex.lineAtOffset(startingOffset),
+                        columnAtOffset(startingOffset),
+                        startingOffset
+                )
         );
 
         return parsed.ast();

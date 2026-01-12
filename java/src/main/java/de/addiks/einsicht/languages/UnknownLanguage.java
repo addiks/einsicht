@@ -8,11 +8,13 @@ import de.addiks.einsicht.abstract_syntax_tree.patterns.TokenNodePattern;
 import de.addiks.einsicht.semantics.Semantic;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.TokenMatcher;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.matchers.RegexMatcher;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+@NonNullByDefault
 public class UnknownLanguage extends Language {
     public UnknownLanguage(Hub hub) {
         super(hub);

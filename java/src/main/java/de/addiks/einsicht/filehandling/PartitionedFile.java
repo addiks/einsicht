@@ -1,17 +1,21 @@
 package de.addiks.einsicht.filehandling;
 
 import com.sigpwned.chardet4j.Chardet;
+import de.addiks.einsicht.abstract_syntax_tree.ASTRoot;
 import de.addiks.einsicht.filehandling.codings.BinaryString;
 import de.addiks.einsicht.filehandling.codings.DecodedString;
 import de.addiks.einsicht.filehandling.codings.MappedString;
 import de.addiks.einsicht.filehandling.writing.FileWriteStrategy;
 import de.addiks.einsicht.filehandling.writing.WriteWholeFileDirectly;
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
@@ -45,10 +49,13 @@ public class PartitionedFile {
         return false;
     }
 
+    @NonNullByDefault
     public interface Partition {
         boolean modified();
         MappedString currentContent();
+        ASTRoot syntaxTree();
         void resetTo(MappedString content) throws IOException;
+        Partition appendBy(Partition other);
 
         interface Factory {
             Partition create(
@@ -67,52 +74,126 @@ public class PartitionedFile {
         return file;
     }
 
-    public List<PartitionAtArea> partitionsFor(long offset, int length) throws IOException {
+    public PartitionAtArea partitionFor(long offset, int length) throws IOException {
         List<PartitionAtArea> foundPartitions = new ArrayList<>();
         List<Area> notCoveredAreas = new ArrayList<>();
         notCoveredAreas.add(new Area(offset, length));
 
         while (!notCoveredAreas.isEmpty()) {
             Area areaToCover = notCoveredAreas.removeFirst();
-
             for (PartitionAtArea partitionAtArea : this.partitions) {
                 if (partitionAtArea.area.containsWholly(areaToCover)) {
                     foundPartitions.add(partitionAtArea);
-
                 } else if (partitionAtArea.area.overlaps(areaToCover)) {
                     foundPartitions.add(partitionAtArea);
                     notCoveredAreas.addAll(areaToCover.cut(partitionAtArea.area));
                 }
             }
 
-            Partition newPartition = partitionFactory.create(
-                    readData(areaToCover),
-                    areaToCover.offset
-            );
+            Partition newPartition = partitionFactory.create(readData(areaToCover), areaToCover.offset);
 
             Area areaBefore = areaDirectlyBefore(areaToCover.offset);
             if (areaBefore != null) {
                 PartitionAtArea partitionBefore = areaToPartition.get(areaBefore);
                 newPartition = partitionFactory.combine(partitionBefore.partition, newPartition);
-                this.partitions.remove(partitionBefore);
-                areaToPartition.remove(areaBefore);
+                remove(partitionBefore);
             }
 
             Area areaAfter = areaDirectlyAfter(areaToCover.end());
             if (areaAfter != null) {
                 PartitionAtArea partitionAfter = areaToPartition.get(areaAfter);
                 newPartition = partitionFactory.combine(newPartition, partitionAfter.partition);
-                this.partitions.remove(partitionAfter);
-                areaToPartition.remove(areaAfter);
+                remove(partitionAfter);
             }
 
             PartitionAtArea newPartitionAtArea = new PartitionAtArea(newPartition, areaToCover);
             foundPartitions.add(newPartitionAtArea);
-            areaToPartition.put(areaToCover, newPartitionAtArea);
-            this.partitions.add(areaToPartition.get(areaToCover));
+            add(newPartitionAtArea);
         }
 
-        return foundPartitions;
+        if (foundPartitions.size() == 1) {
+            return foundPartitions.getFirst();
+        }
+
+        foundPartitions.sort((a,b) -> (int) (a.area.offset - b.area.offset));
+        PartitionAtArea mergedPartition = foundPartitions.removeFirst();
+        remove(mergedPartition);
+        while (!foundPartitions.isEmpty()) {
+            PartitionAtArea partitionToMerge = foundPartitions.removeFirst();
+            remove(partitionToMerge);
+            try {
+                mergedPartition = mergedPartition.merge(partitionToMerge);
+            } catch (Throwable e) {
+                add(partitionToMerge);
+                throw e;
+            } finally {
+                add(mergedPartition);
+            }
+        }
+
+        return mergedPartition;
+    }
+
+    public record PartitionAtArea(Partition partition, Area area) {
+        public PartitionAtArea merge(PartitionAtArea other) {
+            return new PartitionAtArea(
+                    partition.appendBy(other.partition),
+                    area.extend(other.area)
+            );
+        }
+    }
+
+    public record Area(long offset, int length) {
+        long end() {
+            return offset + length;
+        }
+        boolean containsWholly(Area other) {
+            return offset <= other.offset && end() >= other.end();
+        }
+        boolean overlapsAtBeginning(Area other) {
+            return offset <= other.offset && end() <= other.end();
+        }
+        boolean overlaps(Area other) {
+            return overlapsAtBeginning(other) || overlapsAtEnd(other);
+        }
+        boolean overlapsAtEnd(Area other) {
+            return offset >= other.offset && end() >= other.end();
+        }
+        List<Area> cut(Area cutout) {
+            if (cutout.containsWholly(this)) {
+                return List.of();
+            }
+            if (!overlaps(cutout)) {
+                return List.of(this);
+            }
+            List<Area> cutOuts = new ArrayList<>();
+            if (offset < cutout.offset) {
+                cutOuts.add(new Area(offset, (int) (cutout.offset - offset)));
+            }
+            if (end() > cutout.end()) {
+                cutOuts.add(new Area(end(), (int) (end() - cutout.end())));
+            }
+            return cutOuts;
+        }
+        Area extend(Area other) {
+            if (offset == other.offset + other.length) {
+                return other.extend(this);
+            } else if (offset + length == other.offset) {
+                return new Area(offset, length + other.length);
+            } else {
+                throw new IllegalArgumentException("Can only extend areas that are directly following each other!");
+            }
+        }
+    }
+
+    private void add(PartitionAtArea partitionAtArea) {
+        partitions.add(partitionAtArea);
+        areaToPartition.put(partitionAtArea.area, partitionAtArea);
+    }
+
+    private void remove(PartitionAtArea partitionAtArea) {
+        partitions.remove(partitionAtArea);
+        areaToPartition.remove(partitionAtArea.area);
     }
 
     private FileWriteStrategy determineBestWritingStrategy() {
@@ -124,6 +205,9 @@ public class PartitionedFile {
     }
 
     private MappedString readData(Area area) throws IOException {
+        if (!file.exists()) {
+            return new DecodedString(StandardCharsets.UTF_8, List.of());
+        }
         lock.lock();
         try {
             cancelCurrentFileAccessClosure();
@@ -216,41 +300,6 @@ public class PartitionedFile {
             log.error("Exception white closing file access: {}", e.getMessage(), e);
         } finally {
             accessCloseFuture = null;
-        }
-    }
-
-    public record PartitionAtArea(Partition partition, Area area) {}
-    public record Area(long offset, int length) {
-        long end() {
-            return offset + length;
-        }
-        boolean containsWholly(Area other) {
-            return offset <= other.offset && end() >= other.end();
-        }
-        boolean overlapsAtBeginning(Area other) {
-            return offset <= other.offset && end() <= other.end();
-        }
-        boolean overlaps(Area other) {
-            return overlapsAtBeginning(other) || overlapsAtEnd(other);
-        }
-        boolean overlapsAtEnd(Area other) {
-            return offset >= other.offset && end() >= other.end();
-        }
-        List<Area> cut(Area cutout) {
-            if (cutout.containsWholly(this)) {
-                return List.of();
-            }
-            if (!overlaps(cutout)) {
-                return List.of(this);
-            }
-            List<Area> cutOuts = new ArrayList<>();
-            if (offset < cutout.offset) {
-                cutOuts.add(new Area(offset, (int) (cutout.offset - offset)));
-            }
-            if (end() > cutout.end()) {
-                cutOuts.add(new Area(end(), (int) (end() - cutout.end())));
-            }
-            return cutOuts;
         }
     }
 

@@ -13,12 +13,14 @@ import de.addiks.einsicht.abstract_syntax_tree.tokens.matchers.DirectTokenMatche
 import de.addiks.einsicht.abstract_syntax_tree.tokens.matchers.KeywordsTokenMatcher;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.matchers.LiteralTokenMatcher;
 import de.addiks.einsicht.abstract_syntax_tree.tokens.matchers.RegexMatcher;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+@NonNullByDefault
 public class PythonLanguage extends Language {
     public PythonLanguage(Hub hub) {
         super(hub);
